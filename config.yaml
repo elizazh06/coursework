@@ -1,0 +1,23 @@
+dataset:
+  module: music_avqa
+  name: MusicAVQADataset
+  batch_size: 2
+  params:
+    root_dir: ./data/music_avqa
+    split: train
+    max_len: 16
+    download: true
+
+model:
+  module: music_avqa_baseline
+  name: AVQABaselineModel
+  params:
+    vocab_size: 5000
+    embed_dim: 256
+    hidden_dim: 512
+    num_classes: 10
+
+training:
+  lr: 1e-4
+  epochs: 3
+  device: cuda
