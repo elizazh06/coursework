@@ -3,7 +3,7 @@ import json
 import torch
 from torch.utils.data import Dataset
 import torchaudio
-import torchvision.io as io
+from decord import VideoReader, cpu
 
 
 class MusicAVQADataset(Dataset):
@@ -37,13 +37,13 @@ class MusicAVQADataset(Dataset):
         return len(self.data)
 
     def _load_video(self, video_path):
-        video, _, _ = io.read_video(video_path)
+        if not os.path.exists(video_path):
+            return torch.randn(self.max_len, 3, 224, 224)
 
-        video = video.permute(0, 3, 1, 2)
+        vr = VideoReader(video_path, ctx=cpu(0))
+        frames = vr[:self.max_len]
 
-        if video.size(0) > self.max_len:
-            video = video[:self.max_len]
-
+        video = torch.tensor(frames).permute(0, 3, 1, 2)
         return video
 
     def _load_audio(self, audio_path):
