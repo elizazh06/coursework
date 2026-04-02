@@ -14,6 +14,7 @@ class AVSUPipeline:
         dataset_class = getattr(dataset_module, config["dataset"]["name"])
 
         self.dataset = dataset_class(**config["dataset"]["params"])
+        config["model"]["params"]["num_classes"] = self.dataset.num_classes
 
         self.dataloader = DataLoader(
             self.dataset,

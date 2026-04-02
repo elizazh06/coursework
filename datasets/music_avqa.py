@@ -21,6 +21,17 @@ class MusicAVQADataset(Dataset):
 
         with open(ann_path, "r") as f:
             self.data = json.load(f)
+        
+        self.answer_vocab = {}
+        self.answer_to_idx = {}
+
+        for item in self.data:
+            ans = item["anser"]
+            if ans not in self.answer_vocab:
+                self.answer_vocab[ans] = len(self.answer_vocab)
+
+        self.answer_to_idx = self.answer_vocab
+        self.num_classes = len(self.answer_vocab)
 
     def __len__(self):
         return len(self.data)
@@ -68,6 +79,6 @@ class MusicAVQADataset(Dataset):
         audio = self._load_audio(audio_path)
         question = self._encode_question(question)
 
-        label = torch.tensor(answer, dtype=torch.long)
+        label = torch.tensor(self.answer_to_idx[answer], dtype=torch.long)
 
         return video, audio, question, label
