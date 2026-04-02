@@ -51,7 +51,6 @@ class AVSUPipeline:
         elif len(batch[0]) == 4:
             video, audio, question, label = zip(*batch)
 
-            # padding для question
             max_len = max(q.size(0) for q in question)
             padded_q = []
             for q in question:
@@ -85,7 +84,7 @@ class AVSUPipeline:
 
         progress_bar = tqdm(
             self.dataloader,
-            desc=f"Epoch {self.current_epoch}",
+            desc=f"Epoch {self.epoch}",
             leave=False
         )
 
@@ -129,9 +128,10 @@ class AVSUPipeline:
 
     def run(self):
         epochs = self.config["training"]["epochs"]
+        self.epoch = 0
 
-        for epoch in range(epochs):
-            print(f"\nEpoch {epoch+1}/{epochs}")
+        while self.epoch < epochs:
+            print(f"\nEpoch {self.epoch+1}/{epochs}")
 
             start = time.time()
             loss = self.train_epoch()
