@@ -32,7 +32,7 @@ class AVSUPipeline:
         self.criterion = torch.nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
-            lr=config["training"].get("lr", 1e-4)
+            lr=float(config["training"].get("lr", 1e-4))
         )
 
     def collate_fn(self, batch):
