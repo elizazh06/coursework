@@ -68,14 +68,19 @@ class AVSUPipeline:
             raise ValueError("Unsupported dataset format")
 
     def forward_pass(self, batch):
-        video = batch["video"].to(self.device)
-        audio = batch["audio"].to(self.device)
-        labels = batch["label"].to(self.device)
         if len(batch) == 3:
+            video, audio, labels = batch
+            video = video.to(self.device)
+            audio = audio.to(self.device)
+            labels = labels.to(self.device)
             return self.model(video, audio), labels
 
         elif len(batch) == 4:
-            question = batch["question"].to(self.device)
+            video, audio, question, labels = batch
+            video = video.to(self.device)
+            audio = audio.to(self.device)
+            question = question.to(self.device)
+            labels = labels.to(self.device)
             return self.model(video, audio, question), labels
 
     def train_epoch(self):
