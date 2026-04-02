@@ -59,7 +59,7 @@ class MusicAVQADataset(Dataset):
 
         video_id = item["video_id"]
         question = item["question_content"]
-        answer = item["answer"]
+        answer = item["anser"]
 
         video_path = os.path.join(self.root_dir, "video", f"{video_id}.mp4")
         audio_path = os.path.join(self.root_dir, "audio", f"{video_id}.wav")
