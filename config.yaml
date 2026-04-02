@@ -6,7 +6,6 @@ dataset:
     root_dir: ./data/music_avqa
     split: train
     max_len: 16
-    download: true
 
 model:
   module: music_avqa_baseline
