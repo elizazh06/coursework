@@ -37,15 +37,14 @@ class MusicAVQADataset(Dataset):
         return len(self.data)
 
     def _load_video(self, video_path):
-        if not os.path.exists(video_path):
-            return torch.randn(self.max_len, 512)
-
         video, _, _ = io.read_video(video_path)
+
+        video = video.permute(0, 3, 1, 2)
 
         if video.size(0) > self.max_len:
             video = video[:self.max_len]
 
-        return video.mean(dim=(1, 2, 3))
+        return video
 
     def _load_audio(self, audio_path):
         if not os.path.exists(audio_path):
