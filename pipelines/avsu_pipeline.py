@@ -1,6 +1,8 @@
 import torch
 from torch.utils.data import DataLoader
 import importlib
+from tqdm.notebook import tqdm
+import time
 
 
 class AVSUPipeline:
@@ -79,10 +81,17 @@ class AVSUPipeline:
         self.model.train()
         total_loss = 0
 
-        for batch in self.dataloader:
-            batch = [x.to(self.device) for x in batch]
+        start_time = time.time()
 
+        progress_bar = tqdm(
+            self.dataloader,
+            desc=f"Epoch {self.current_epoch}",
+            leave=False
+        )
+
+        for batch in progress_bar:
             self.optimizer.zero_grad()
+
             outputs, labels = self.forward_pass(batch)
 
             loss = self.criterion(outputs, labels)
@@ -90,6 +99,14 @@ class AVSUPipeline:
             self.optimizer.step()
 
             total_loss += loss.item()
+
+            progress_bar.set_postfix({
+                "loss": f"{loss.item():.4f}"
+            })
+
+        epoch_time = time.time() - start_time
+
+        print(f"Epoch time: {epoch_time:.2f} sec")
 
         return total_loss / len(self.dataloader)
 
@@ -114,7 +131,11 @@ class AVSUPipeline:
         epochs = self.config["training"]["epochs"]
 
         for epoch in range(epochs):
-            loss = self.train_epoch()
-            acc = self.evaluate()
+            print(f"\nEpoch {epoch+1}/{epochs}")
 
-            print(f"Epoch {epoch+1}: loss={loss:.4f}, acc={acc:.4f}")
+            start = time.time()
+            loss = self.train_epoch()
+            end = time.time()
+
+            print(f"Loss: {loss:.4f}")
+            print(f"Epoch duration: {(end - start):.2f} sec")
