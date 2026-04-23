@@ -3,15 +3,22 @@ dataset:
   name: MusicAVQADataset
   train_split: train
   val_split: val
-  batch_size: 2
+  test_split: test
+  batch_size: 32
+  eval_batch_size: 64
   num_workers: 2
   params:
     root_dir: ./data/music_avqa
-    max_len: 16
+    max_len: 10
     max_samples:
-    vocab_size: 5000
+    vocab_size: 1000
     prepare_data: true
-    strict_media: false
+    strict_media: true
+    use_official_features: true
+    features:
+      audio_dir: ./data/music_avqa/feats/vggish
+      visual_dir: ./data/music_avqa/feats/res18_14x14
+    frame_stride: 6
     download:
       annotations:
         train: ""
@@ -23,15 +30,19 @@ dataset:
       archives: []
 
 model:
-  module: music_avqa_baseline
-  name: AVQABaselineModel
+  module: music_avqa_author_baseline
+  name: AVQAAuthorBaselineModel
   params:
-    vocab_size: 5000
-    embed_dim: 256
+    vocab_size: 1000
     hidden_dim: 512
-    use_pretrained_backbone: true
+    dropout: 0.1
+    num_heads: 4
 
 training:
   lr: 1e-4
-  epochs: 3
+  epochs: 15
   device: cuda
+  weight_decay: 1e-5
+  lr_step_size: 8
+  lr_gamma: 0.1
+  grad_clip_norm: 1.0

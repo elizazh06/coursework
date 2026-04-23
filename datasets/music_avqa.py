@@ -1,10 +1,11 @@
+import ast
 import json
-import os
 import tarfile
 import urllib.request
 import zipfile
 from pathlib import Path
 
+import numpy as np
 import torch
 import torchaudio
 from decord import VideoReader, cpu
@@ -22,6 +23,11 @@ class MusicAVQADataset(Dataset):
         download=None,
         strict_media=False,
         max_samples=None,
+        answer_to_idx=None,
+        word_to_idx=None,
+        use_official_features=True,
+        features=None,
+        frame_stride=6,
     ):
         self.root_dir = Path(root_dir)
         self.split = split
@@ -29,10 +35,19 @@ class MusicAVQADataset(Dataset):
         self.vocab_size = vocab_size
         self.strict_media = strict_media
         self.download_cfg = download or {}
+        self.use_official_features = use_official_features
+        self.frame_stride = frame_stride
+        self.features_cfg = features or {}
 
         self.annotations_dir = self.root_dir / "annotations"
         self.video_dir = self.root_dir / "video"
         self.audio_dir = self.root_dir / "audio"
+        self.feature_audio_dir = Path(
+            self.features_cfg.get("audio_dir", self.root_dir / "feats" / "vggish")
+        )
+        self.feature_visual_dir = Path(
+            self.features_cfg.get("visual_dir", self.root_dir / "feats" / "res18_14x14")
+        )
         self.ann_path = self.annotations_dir / f"{split}.json"
 
         if prepare_data:
@@ -49,14 +64,15 @@ class MusicAVQADataset(Dataset):
         if max_samples is not None:
             self.data = self.data[: int(max_samples)]
 
-        self.answer_vocab = {}
-        for item in self.data:
-            ans = item.get("answer", item.get("anser", "unknown"))
-            if ans not in self.answer_vocab:
-                self.answer_vocab[ans] = len(self.answer_vocab)
-
-        self.answer_to_idx = self.answer_vocab
+        self.word_to_idx = word_to_idx if word_to_idx is not None else self._build_word_vocab(self.data)
+        self.answer_to_idx = (
+            answer_to_idx if answer_to_idx is not None else self._build_answer_vocab(self.data)
+        )
         self.num_classes = len(self.answer_vocab)
+
+    @property
+    def answer_vocab(self):
+        return self.answer_to_idx
 
     def prepare_data(self):
         self.root_dir.mkdir(parents=True, exist_ok=True)
@@ -79,6 +95,41 @@ class MusicAVQADataset(Dataset):
             if not destination.exists():
                 self._download_file(url, destination)
             self._extract_archive(destination, extract_to)
+
+    def _build_answer_vocab(self, items):
+        answer_to_idx = {}
+        for item in items:
+            answer = item.get("answer", item.get("anser", "unknown"))
+            if answer not in answer_to_idx:
+                answer_to_idx[answer] = len(answer_to_idx)
+        return answer_to_idx
+
+    def _tokenize_question(self, item):
+        question = item["question_content"].rstrip().split(" ")
+        if question and question[-1].endswith("?"):
+            question[-1] = question[-1][:-1]
+
+        templ_values = item.get("templ_values", "[]")
+        try:
+            templ_values = ast.literal_eval(templ_values) if isinstance(templ_values, str) else templ_values
+        except (ValueError, SyntaxError):
+            templ_values = []
+
+        pointer = 0
+        for i, token in enumerate(question):
+            if "<" in token and pointer < len(templ_values):
+                question[i] = str(templ_values[pointer])
+                pointer += 1
+
+        return [w.lower() for w in question if w]
+
+    def _build_word_vocab(self, items):
+        vocab = {" ": 0}
+        for item in items:
+            for token in self._tokenize_question(item):
+                if token not in vocab:
+                    vocab[token] = len(vocab)
+        return vocab
 
     def _download_file(self, url, destination):
         destination = Path(destination)
@@ -116,6 +167,15 @@ class MusicAVQADataset(Dataset):
                 "Provide media base URLs in config.download.media or set strict_media=false."
             )
 
+    def _time_sample_and_pad(self, tensor_2d, max_len):
+        sampled = tensor_2d[:: self.frame_stride]
+        if sampled.size(0) > max_len:
+            sampled = sampled[:max_len]
+        elif sampled.size(0) < max_len:
+            pad = max_len - sampled.size(0)
+            sampled = torch.cat([sampled, torch.zeros(pad, sampled.size(1), dtype=sampled.dtype)], dim=0)
+        return sampled
+
     def __len__(self):
         return len(self.data)
 
@@ -151,33 +211,76 @@ class MusicAVQADataset(Dataset):
 
         return mel
 
+    def _load_feature_audio(self, video_id):
+        feature_path = self.feature_audio_dir / f"{video_id}.npy"
+        if not feature_path.exists():
+            return None
+        audio = torch.from_numpy(np.load(feature_path)).float()
+        return self._time_sample_and_pad(audio, self.max_len)
+
+    def _load_feature_visual(self, video_id):
+        feature_path = self.feature_visual_dir / f"{video_id}.npy"
+        if not feature_path.exists():
+            return None
+        visual = torch.from_numpy(np.load(feature_path)).float()
+        visual = visual[:: self.frame_stride]
+        if visual.size(0) > self.max_len:
+            visual = visual[: self.max_len]
+        elif visual.size(0) < self.max_len:
+            pad_t = self.max_len - visual.size(0)
+            pad = torch.zeros(pad_t, visual.size(1), visual.size(2), visual.size(3), dtype=visual.dtype)
+            visual = torch.cat([visual, pad], dim=0)
+        return visual
+
     def _encode_question(self, question):
-        tokens = question.lower().split()
-        hashed = [hash(w) % self.vocab_size for w in tokens]
-        if not hashed:
-            hashed = [0]
-        return torch.tensor(hashed, dtype=torch.long)
+        encoded = [self.word_to_idx.get(token, 0) for token in question]
+        if not encoded:
+            encoded = [0]
+        return torch.tensor(encoded, dtype=torch.long)
 
     def __getitem__(self, idx):
         item = self.data[idx]
 
         video_id = item["video_id"]
-        question = item["question_content"]
+        question = self._tokenize_question(item)
         answer = item.get("answer", item.get("anser", "unknown"))
+        question_id = item.get("question_id", idx)
+        question_type = item.get("type", "[]")
 
-        video_path = self.video_dir / f"{video_id}.mp4"
-        audio_path = self.audio_dir / f"{video_id}.wav"
-        self._maybe_download_media(video_id, video_path, audio_path)
+        visual_posi = None
+        audio = None
 
-        video = self._load_video(video_path)
-        audio = self._load_audio(audio_path)
+        if self.use_official_features:
+            audio = self._load_feature_audio(video_id)
+            visual_posi = self._load_feature_visual(video_id)
+
+        if audio is None or visual_posi is None:
+            video_path = self.video_dir / f"{video_id}.mp4"
+            audio_path = self.audio_dir / f"{video_id}.wav"
+            self._maybe_download_media(video_id, video_path, audio_path)
+
+            if audio is None:
+                audio = self._load_audio(audio_path)
+
+            if visual_posi is None:
+                video = self._load_video(video_path)
+                # Raw-video fallback: convert to pseudo [T, 512, 14, 14] map.
+                visual_posi = torch.nn.functional.interpolate(video, size=(14, 14), mode="bilinear")
+                visual_posi = visual_posi.mean(dim=1, keepdim=True).repeat(1, 512, 1, 1)
+
         question = self._encode_question(question)
 
-        label = torch.tensor(self.answer_to_idx[answer], dtype=torch.long)
+        if answer not in self.answer_to_idx:
+            label = torch.tensor(-1, dtype=torch.long)
+        else:
+            label = torch.tensor(self.answer_to_idx[answer], dtype=torch.long)
 
         return {
-            "video": video,
+            "video": visual_posi,
             "audio": audio,
             "question": question,
             "label": label,
+            "question_id": question_id,
+            "question_type": question_type,
+            "video_id": video_id,
         }
