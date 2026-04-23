@@ -1,11 +1,26 @@
 dataset:
   module: music_avqa
   name: MusicAVQADataset
+  train_split: train
+  val_split: val
   batch_size: 2
+  num_workers: 2
   params:
     root_dir: ./data/music_avqa
-    split: train
     max_len: 16
+    max_samples:
+    vocab_size: 5000
+    prepare_data: true
+    strict_media: false
+    download:
+      annotations:
+        train: ""
+        val: ""
+        test: ""
+      media:
+        video_base_url: ""
+        audio_base_url: ""
+      archives: []
 
 model:
   module: music_avqa_baseline
@@ -14,6 +29,7 @@ model:
     vocab_size: 5000
     embed_dim: 256
     hidden_dim: 512
+    use_pretrained_backbone: true
 
 training:
   lr: 1e-4

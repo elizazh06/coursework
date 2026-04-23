@@ -9,11 +9,20 @@ class AVQABaselineModel(nn.Module):
         vocab_size=5000,
         embed_dim=256,
         hidden_dim=512,
-        num_classes=10
+        num_classes=10,
+        use_pretrained_backbone=True,
+        dropout=0.2,
     ):
         super().__init__()
-        
-        resnet = models.resnet18(pretrained=True)
+
+        weights = None
+        if use_pretrained_backbone:
+            try:
+                weights = models.ResNet18_Weights.DEFAULT
+            except AttributeError:
+                weights = None
+
+        resnet = models.resnet18(weights=weights)
         self.video_encoder = nn.Sequential(*list(resnet.children())[:-1])  # remove fc
         self.video_fc = nn.Linear(512, hidden_dim)
 
@@ -28,6 +37,7 @@ class AVQABaselineModel(nn.Module):
         self.lstm = nn.LSTM(embed_dim, hidden_dim, batch_first=True)
 
         self.fusion = nn.Linear(hidden_dim * 3, hidden_dim)
+        self.dropout = nn.Dropout(dropout)
 
         self.classifier = nn.Linear(hidden_dim, num_classes)
 
@@ -55,6 +65,6 @@ class AVQABaselineModel(nn.Module):
         q_feat = h[-1]
 
         fused = torch.cat([v_feat, a_feat, q_feat], dim=1)
-        fused = self.fusion(fused)
+        fused = self.dropout(torch.relu(self.fusion(fused)))
 
         return self.classifier(fused)
