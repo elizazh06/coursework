@@ -88,6 +88,7 @@ class AVSUPipeline:
         )
         self.grad_clip_norm = float(config["training"].get("grad_clip_norm", 1.0))
         self.scaler = torch.amp.GradScaler(enabled=(self.device != "cpu"))
+        self.epoch = 0
 
     def collate_fn(self, batch):
         if isinstance(batch[0], dict):

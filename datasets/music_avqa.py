@@ -1,8 +1,9 @@
 import ast
 import json
-import tarfile
+import shutil
+import subprocess
 import urllib.request
-import zipfile
+import wave
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,51 @@ import torch
 import torchaudio
 from decord import VideoReader, cpu
 from torch.utils.data import Dataset
+
+
+def _download_file(url: str, destination: Path) -> None:
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[MusicAVQA] Downloading {url} -> {destination}")
+    req = urllib.request.Request(url, headers={"User-Agent": "MusicAVQA-dataset/1.0"})
+    with urllib.request.urlopen(req) as resp, open(destination, "wb") as out:
+        shutil.copyfileobj(resp, out)
+
+
+def _extract_wav_from_video(video_path: Path, wav_path: Path) -> None:
+    """Cache mono 16 kHz PCM WAV extracted from video (ffmpeg)."""
+    if shutil.which("ffmpeg") is None:
+        raise RuntimeError(
+            "ffmpeg is required to extract audio from video. "
+            "Install ffmpeg (e.g. apt install ffmpeg) or use an image that includes it."
+        )
+    wav_path = Path(wav_path)
+    wav_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = wav_path.with_suffix(".tmp.wav")
+    cmd = [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+        str(video_path),
+        "-vn",
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        str(tmp),
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        err = (e.stderr or "") + (e.stdout or "")
+        raise RuntimeError(f"ffmpeg failed for {video_path}: {err}") from e
+    tmp.replace(wav_path)
 
 
 class MusicAVQADataset(Dataset):
@@ -29,7 +75,7 @@ class MusicAVQADataset(Dataset):
         features=None,
         frame_stride=6,
     ):
-        self.root_dir = Path(root_dir)
+        self.root_dir = Path(root_dir).resolve()
         self.split = split
         self.max_len = max_len
         self.vocab_size = vocab_size
@@ -44,10 +90,10 @@ class MusicAVQADataset(Dataset):
         self.audio_dir = self.root_dir / "audio"
         self.feature_audio_dir = Path(
             self.features_cfg.get("audio_dir", self.root_dir / "feats" / "vggish")
-        )
+        ).resolve()
         self.feature_visual_dir = Path(
             self.features_cfg.get("visual_dir", self.root_dir / "feats" / "res18_14x14")
-        )
+        ).resolve()
         self.ann_path = self.annotations_dir / f"{split}.json"
 
         if prepare_data:
@@ -56,7 +102,8 @@ class MusicAVQADataset(Dataset):
         if not self.ann_path.exists():
             raise RuntimeError(
                 f"{self.ann_path} not found. "
-                "Provide download.annotations.<split> URL in config or prepare data manually."
+                "Place JSON annotations under data/music_avqa/annotations/ "
+                "or set download.annotations.<split> to a URL in config."
             )
 
         with self.ann_path.open("r", encoding="utf-8") as f:
@@ -83,18 +130,10 @@ class MusicAVQADataset(Dataset):
         if not self.ann_path.exists():
             ann_url = self.download_cfg.get("annotations", {}).get(self.split)
             if ann_url:
-                self._download_file(ann_url, self.ann_path)
+                self._download_file(str(ann_url), self.ann_path)
 
-        archives = self.download_cfg.get("archives", [])
-        for archive in archives:
-            url = archive.get("url")
-            if not url:
-                continue
-            destination = self.root_dir / archive.get("filename", Path(url).name)
-            extract_to = self.root_dir / archive.get("extract_to", "")
-            if not destination.exists():
-                self._download_file(url, destination)
-            self._extract_archive(destination, extract_to)
+    def _download_file(self, url, destination):
+        _download_file(str(url), Path(destination))
 
     def _build_answer_vocab(self, items):
         answer_to_idx = {}
@@ -131,41 +170,30 @@ class MusicAVQADataset(Dataset):
                     vocab[token] = len(vocab)
         return vocab
 
-    def _download_file(self, url, destination):
-        destination = Path(destination)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        print(f"[MusicAVQA] Downloading {url} -> {destination}")
-        urllib.request.urlretrieve(url, destination)
-
-    def _extract_archive(self, archive_path, target_dir):
-        archive_path = Path(archive_path)
-        target_dir = Path(target_dir)
-        if archive_path.suffix == ".zip":
-            with zipfile.ZipFile(archive_path, "r") as zf:
-                zf.extractall(target_dir)
-        elif archive_path.suffix in {".tgz", ".gz"} or archive_path.name.endswith(".tar.gz"):
-            with tarfile.open(archive_path, "r:*") as tf:
-                tf.extractall(target_dir)
-        elif archive_path.suffix == ".tar":
-            with tarfile.open(archive_path, "r") as tf:
-                tf.extractall(target_dir)
-
-    def _maybe_download_media(self, video_id, video_path, audio_path):
+    def _ensure_video(self, video_id: str, video_path: Path) -> None:
         media_cfg = self.download_cfg.get("media", {})
-        video_base_url = media_cfg.get("video_base_url", "").rstrip("/")
-        audio_base_url = media_cfg.get("audio_base_url", "").rstrip("/")
+        video_base_url = str(media_cfg.get("video_base_url", "")).rstrip("/")
 
-        if not video_path.exists() and video_base_url:
-            self._download_file(f"{video_base_url}/{video_id}.mp4", video_path)
+        if video_path.exists():
+            return
+        if not video_base_url:
+            if self.strict_media:
+                raise FileNotFoundError(
+                    f"Missing video {video_path} and download.media.video_base_url is not set."
+                )
+            return
+        url = f"{video_base_url}/{video_id}.mp4"
+        self._download_file(url, video_path)
 
-        if not audio_path.exists() and audio_base_url:
-            self._download_file(f"{audio_base_url}/{video_id}.wav", audio_path)
-
-        if self.strict_media and (not video_path.exists() or not audio_path.exists()):
-            raise FileNotFoundError(
-                f"Missing media for {video_id}. "
-                "Provide media base URLs in config.download.media or set strict_media=false."
-            )
+    def _ensure_audio_wav(self, video_id: str, video_path: Path, audio_path: Path) -> None:
+        """Derive cached WAV from video when raw audio features are not used."""
+        if audio_path.exists():
+            return
+        if not video_path.exists():
+            if self.strict_media:
+                raise FileNotFoundError(f"Cannot extract audio: missing video {video_path}")
+            return
+        _extract_wav_from_video(video_path, audio_path)
 
     def _time_sample_and_pad(self, tensor_2d, max_len):
         sampled = tensor_2d[:: self.frame_stride]
@@ -194,17 +222,44 @@ class MusicAVQADataset(Dataset):
         video = torch.tensor(frames.asnumpy()).permute(0, 3, 1, 2).float() / 255.0
         return video
 
+    def _load_wav_pcm(self, audio_path: Path) -> tuple[torch.Tensor, int]:
+        """Load mono/stereo PCM WAV without torchaudio.load (avoids torchcodec dependency)."""
+        with wave.open(str(audio_path), "rb") as wf:
+            sr = wf.getframerate()
+            nch = wf.getnchannels()
+            sw = wf.getsampwidth()
+            nframes = wf.getnframes()
+            raw = wf.readframes(nframes)
+        if sw == 2:
+            flat = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+            x = flat.reshape(-1, nch).mean(axis=1)
+        elif sw == 4:
+            flat = np.frombuffer(raw, dtype=np.int32).astype(np.float32) / 2147483648.0
+            x = flat.reshape(-1, nch).mean(axis=1)
+        elif sw == 1:
+            flat = np.frombuffer(raw, dtype=np.uint8).astype(np.float32)
+            x = (flat.reshape(-1, nch).mean(axis=1) - 128.0) / 128.0
+        else:
+            raise ValueError(f"Unsupported WAV sample width {sw} in {audio_path}")
+        waveform = torch.from_numpy(x).unsqueeze(0)
+        return waveform, sr
+
     def _load_audio(self, audio_path):
         if not Path(audio_path).exists():
             return torch.zeros(self.max_len, 128)
 
-        waveform, sr = torchaudio.load(audio_path)
-        mel = torchaudio.transforms.MelSpectrogram(sample_rate=sr, n_mels=128)(waveform)
+        waveform, sr = self._load_wav_pcm(Path(audio_path))
+        mel = torchaudio.transforms.MelSpectrogram(
+            sample_rate=sr,
+            n_mels=128,
+            n_fft=1024,
+            hop_length=256,
+        )(waveform)
 
         mel = mel.squeeze(0).transpose(0, 1)
 
         if mel.size(0) > self.max_len:
-            mel = mel[:self.max_len]
+            mel = mel[: self.max_len]
         elif mel.size(0) < self.max_len:
             pad = self.max_len - mel.size(0)
             mel = torch.cat([mel, torch.zeros(pad, mel.size(1))], dim=0)
@@ -249,24 +304,41 @@ class MusicAVQADataset(Dataset):
 
         visual_posi = None
         audio = None
+        used_raw_video = False
+        used_raw_audio = False
 
         if self.use_official_features:
             audio = self._load_feature_audio(video_id)
             visual_posi = self._load_feature_visual(video_id)
 
+        video_path = self.video_dir / f"{video_id}.mp4"
+        audio_path = self.audio_dir / f"{video_id}.wav"
+
         if audio is None or visual_posi is None:
-            video_path = self.video_dir / f"{video_id}.mp4"
-            audio_path = self.audio_dir / f"{video_id}.wav"
-            self._maybe_download_media(video_id, video_path, audio_path)
+            self._ensure_video(video_id, video_path)
 
             if audio is None:
+                self._ensure_audio_wav(video_id, video_path, audio_path)
                 audio = self._load_audio(audio_path)
+                used_raw_audio = True
 
             if visual_posi is None:
                 video = self._load_video(video_path)
-                # Raw-video fallback: convert to pseudo [T, 512, 14, 14] map.
                 visual_posi = torch.nn.functional.interpolate(video, size=(14, 14), mode="bilinear")
                 visual_posi = visual_posi.mean(dim=1, keepdim=True).repeat(1, 512, 1, 1)
+                used_raw_video = True
+
+        if self.strict_media:
+            if used_raw_video and not video_path.exists():
+                raise FileNotFoundError(
+                    f"Missing video for {video_id}: {video_path}. "
+                    "Check download.media.video_base_url or set strict_media=false."
+                )
+            if used_raw_audio and not audio_path.exists():
+                raise FileNotFoundError(
+                    f"Missing extracted audio for {video_id}: {audio_path}. "
+                    "Ensure ffmpeg can read the video and write to audio cache."
+                )
 
         question = self._encode_question(question)
 

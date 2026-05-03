@@ -14,7 +14,7 @@ dataset:
     vocab_size: 1000
     prepare_data: true
     strict_media: true
-    use_official_features: true
+    use_official_features: false
     features:
       audio_dir: ./data/music_avqa/feats/vggish
       visual_dir: ./data/music_avqa/feats/res18_14x14
@@ -25,9 +25,7 @@ dataset:
         val: ""
         test: ""
       media:
-        video_base_url: ""
-        audio_base_url: ""
-      archives: []
+        video_base_url: "https://huggingface.co/datasets/UnFaZeD07/Music-AVQA/resolve/main/videos"
 
 model:
   module: music_avqa_author_baseline
