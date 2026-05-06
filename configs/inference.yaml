@@ -14,3 +14,14 @@ metrics:
   inference:
     - _target_: metrics.simple_metrics.AccuracyMetric
       name: accuracy
+    - _target_: metrics.simple_metrics.TopKAccuracyMetric
+      k: 3
+      name: top3_accuracy
+    - _target_: metrics.simple_metrics.MacroPrecisionMetric
+      name: macro_precision
+    - _target_: metrics.simple_metrics.MacroRecallMetric
+      name: macro_recall
+    - _target_: metrics.simple_metrics.MacroF1Metric
+      name: macro_f1
+    - _target_: metrics.simple_metrics.BalancedAccuracyMetric
+      name: balanced_accuracy
