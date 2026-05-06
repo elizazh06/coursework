@@ -7,17 +7,17 @@ def _locate(target):
     return getattr(module, attr_name)
 
 
-def instantiate(config, **extra_kwargs):
-    if isinstance(config, list):
-        return [instantiate(item) for item in config]
+def instantiate(obj_cfg, **extra_kwargs):
+    if isinstance(obj_cfg, list):
+        return [instantiate(item) for item in obj_cfg]
 
-    if isinstance(config, dict) and "_target_" in config:
-        params = {k: v for k, v in config.items() if k != "_target_"}
+    if isinstance(obj_cfg, dict) and "_target_" in obj_cfg:
+        params = {k: v for k, v in obj_cfg.items() if k != "_target_"}
         params.update(extra_kwargs)
-        target = _locate(config["_target_"])
+        target = _locate(obj_cfg["_target_"])
         return target(**params)
 
-    if isinstance(config, dict):
-        return {k: instantiate(v) for k, v in config.items()}
+    if isinstance(obj_cfg, dict):
+        return {k: instantiate(v) for k, v in obj_cfg.items()}
 
-    return config
+    return obj_cfg
