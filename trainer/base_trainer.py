@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import inspect
 
 import torch
 from numpy import inf
@@ -372,6 +373,18 @@ class BaseTrainer:
                     batch[transform_name]
                 )
         return batch
+
+    def _model_forward(self, batch):
+        """
+        Call model forward with only supported keyword arguments.
+        This allows datasets to keep extra metadata fields in batch.
+        """
+        signature = inspect.signature(self.model.forward)
+        if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in signature.parameters.values()):
+            return self.model(**batch)
+        accepted = set(signature.parameters.keys())
+        model_inputs = {k: v for k, v in batch.items() if k in accepted}
+        return self.model(**model_inputs)
 
     def _clip_grad_norm(self):
         """
