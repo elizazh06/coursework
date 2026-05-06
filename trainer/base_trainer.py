@@ -512,7 +512,7 @@ class BaseTrainer:
         """
         resume_path = str(resume_path)
         self.logger.info(f"Loading checkpoint: {resume_path} ...")
-        checkpoint = torch.load(resume_path, self.device)
+        checkpoint = self._load_checkpoint_file(resume_path)
         self.start_epoch = checkpoint["epoch"] + 1
         self.mnt_best = checkpoint["monitor_best"]
 
@@ -558,9 +558,24 @@ class BaseTrainer:
             self.logger.info(f"Loading model weights from: {pretrained_path} ...")
         else:
             print(f"Loading model weights from: {pretrained_path} ...")
-        checkpoint = torch.load(pretrained_path, self.device)
+        checkpoint = self._load_checkpoint_file(pretrained_path)
 
         if checkpoint.get("state_dict") is not None:
             self.model.load_state_dict(checkpoint["state_dict"])
         else:
             self.model.load_state_dict(checkpoint)
+
+    def _load_checkpoint_file(self, checkpoint_path):
+        """
+        Load checkpoint in a way that is compatible with PyTorch>=2.6
+        where torch.load defaults to weights_only=True.
+        """
+        try:
+            return torch.load(
+                checkpoint_path,
+                map_location=self.device,
+                weights_only=False,
+            )
+        except TypeError:
+            # For older PyTorch versions that do not support weights_only arg.
+            return torch.load(checkpoint_path, map_location=self.device)
