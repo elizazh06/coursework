@@ -1,0 +1,2 @@
+timestamp_utc,dataset,model,checkpoint,save_path,test_accuracy,test_balanced_accuracy,test_macro_f1,test_macro_precision,test_macro_recall,test_top3_accuracy
+2026-05-06T10:07:17,advance,models.advance_baseline.ADVANCEBaselineModel,checkpoints/advance_baseline/model_best.pth,/content/coursework/data/saved/inference_outputs,0.6171875,0.09183408100575252,0.09594491965185022,0.12411179492240759,0.09183408100575252,0.7714843824505806
