@@ -1,0 +1,69 @@
+trainer:
+  seed: 42
+  device: auto
+  n_epochs: 20
+  save_dir: checkpoints
+  save_period: 1
+  monitor: "max val_accuracy"
+  early_stop: 10
+  max_grad_norm: 1.0
+  skip_oom: true
+  device_tensors: ["video", "audio", "question", "label"]
+  resume_from: null
+  from_pretrained: null
+  epoch_len: null
+  log_step: 50
+
+writer:
+  _target_: writer.simple_writer.SimpleWriter
+  run_name: baseline_run
+  log_checkpoints: false
+  loss_names: ["loss"]
+
+dataset:
+  module: music_avqa
+  name: MusicAVQADataset
+  batch_size: 8
+  eval_batch_size: 8
+  num_workers: 2
+  pin_memory: false
+  params:
+    root_dir: data/music_avqa
+    split: train
+    max_len: 16
+    prepare_data: false
+    strict_media: false
+    max_samples: null
+    use_official_features: true
+    features:
+      audio_dir: data/music_avqa/feats/vggish
+      visual_dir: data/music_avqa/feats/res18_14x14
+
+model:
+  _target_: models.music_avqa_author_baseline.AVQAAuthorBaselineModel
+  vocab_size: 5000
+  hidden_dim: 512
+  num_classes: 42
+  dropout: 0.1
+  num_heads: 4
+
+loss_function:
+  _target_: losses.cross_entropy.CrossEntropyLossWrapper
+
+metrics:
+  train:
+    - _target_: metrics.simple_metrics.AccuracyMetric
+      name: accuracy
+  inference:
+    - _target_: metrics.simple_metrics.AccuracyMetric
+      name: accuracy
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 3e-4
+  weight_decay: 1e-4
+
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.StepLR
+  step_size: 10
+  gamma: 0.5

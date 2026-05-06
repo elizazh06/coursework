@@ -1,0 +1,8 @@
+decord
+hydra-core
+numpy
+pyyaml
+safetensors
+torch
+torchaudio
+tqdm

@@ -1,0 +1,38 @@
+inferencer:
+  seed: 42
+  device: auto
+  save_path: inference_outputs
+  from_pretrained: checkpoints/baseline_run/model_best.pth
+  device_tensors: ["video", "audio", "question", "label"]
+
+dataset:
+  module: music_avqa
+  name: MusicAVQADataset
+  batch_size: 8
+  eval_batch_size: 8
+  num_workers: 2
+  pin_memory: false
+  params:
+    root_dir: data/music_avqa
+    split: test
+    max_len: 16
+    prepare_data: false
+    strict_media: false
+    max_samples: null
+    use_official_features: true
+    features:
+      audio_dir: data/music_avqa/feats/vggish
+      visual_dir: data/music_avqa/feats/res18_14x14
+
+model:
+  _target_: models.music_avqa_author_baseline.AVQAAuthorBaselineModel
+  vocab_size: 5000
+  hidden_dim: 512
+  num_classes: 42
+  dropout: 0.1
+  num_heads: 4
+
+metrics:
+  inference:
+    - _target_: metrics.simple_metrics.AccuracyMetric
+      name: accuracy
