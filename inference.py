@@ -1,5 +1,8 @@
 import warnings
 import argparse
+import csv
+import json
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -71,6 +74,57 @@ def main(config_path, overrides=None):
         for key, value in logs[part].items():
             full_key = part + "_" + key
             print(f"    {full_key:15s}: {value}")
+
+    metrics_filename = config.inferencer.get("metrics_filename", "metrics.json")
+    metrics_path = save_path / metrics_filename
+    with metrics_path.open("w", encoding="utf-8") as f:
+        json.dump(logs, f, ensure_ascii=False, indent=2)
+    print(f"Saved metrics to: {metrics_path}")
+
+    _append_results_row(config, logs, save_path)
+
+
+def _append_results_row(config, logs, save_path):
+    dataset_name = str(config.dataset.module)
+    model_target = str(config.model.get("_target_", "unknown_model"))
+    checkpoint_path = str(config.inferencer.get("from_pretrained", ""))
+
+    row = {
+        "timestamp_utc": datetime.utcnow().isoformat(timespec="seconds"),
+        "dataset": dataset_name,
+        "model": model_target,
+        "checkpoint": checkpoint_path,
+        "save_path": str(save_path),
+    }
+
+    for part, part_metrics in logs.items():
+        for metric_name, value in part_metrics.items():
+            row[f"{part}_{metric_name}"] = value
+
+    results_dir = ROOT_PATH / "data" / "saved" / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    table_path = results_dir / f"{dataset_name}_results.csv"
+
+    existing_rows = []
+    if table_path.exists():
+        with table_path.open("r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            existing_rows = list(reader)
+
+    all_rows = existing_rows + [row]
+    base_cols = ["timestamp_utc", "dataset", "model", "checkpoint", "save_path"]
+    dynamic_cols = sorted(
+        {key for r in all_rows for key in r.keys() if key not in base_cols}
+    )
+    fieldnames = base_cols + dynamic_cols
+
+    with table_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in all_rows:
+            writer.writerow(r)
+
+    print(f"Updated results table: {table_path}")
 
 
 if __name__ == "__main__":

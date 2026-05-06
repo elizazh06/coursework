@@ -9,6 +9,9 @@ inferencer:
   save_path: inference_outputs
   from_pretrained: checkpoints/advance_baseline/model_best.pth
   device_tensors: ["video", "audio", "question", "label"]
+  parts: ["test"]
+  save_predictions: false
+  metrics_filename: test_metrics.json
 
 metrics:
   inference:

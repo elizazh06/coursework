@@ -60,11 +60,17 @@ class Inferencer(BaseTrainer):
         self.batch_transforms = batch_transforms
 
         # define dataloaders
-        self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
+        requested_parts = self.cfg_trainer.get("parts", ["test"])
+        self.evaluation_dataloaders = {
+            k: v for k, v in dataloaders.items() if k in requested_parts
+        }
+        if not self.evaluation_dataloaders:
+            self.evaluation_dataloaders = {"test": dataloaders["test"]}
 
         # path definition
 
         self.save_path = save_path
+        self.save_predictions = bool(self.cfg_trainer.get("save_predictions", False))
 
         # define metrics
         self.metrics = metrics
@@ -150,7 +156,7 @@ class Inferencer(BaseTrainer):
                 "label": label,
             }
 
-            if self.save_path is not None:
+            if self.save_predictions and self.save_path is not None:
                 # you can use safetensors or other lib here
                 torch.save(output, self.save_path / part / f"output_{output_id}.pth")
 
@@ -173,7 +179,7 @@ class Inferencer(BaseTrainer):
         self.evaluation_metrics.reset()
 
         # create Save dir
-        if self.save_path is not None:
+        if self.save_predictions and self.save_path is not None:
             (self.save_path / part).mkdir(exist_ok=True, parents=True)
 
         with torch.no_grad():
