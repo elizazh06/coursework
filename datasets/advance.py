@@ -47,6 +47,19 @@ def _collect_file_list(root: Path, exts: set) -> Dict[str, List[Path]]:
     return by_class
 
 
+def _collect_all_files(root: Path, exts: set) -> List[Path]:
+    if not root.exists():
+        raise FileNotFoundError(f"Path does not exist: {root}")
+    return sorted(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in exts)
+
+
+def _infer_class_name(path: Path, root: Path) -> str:
+    rel_parts = path.relative_to(root).parts
+    if len(rel_parts) >= 2:
+        return rel_parts[-2]
+    return path.parent.name if path.parent.name else "unknown"
+
+
 def _pairs(vision_root: Path, audio_root: Path) -> List[Tuple[Path, Path, str]]:
     vis = _collect_files(vision_root, IMAGE_EXTS)
     aud = _collect_files(audio_root, AUDIO_EXTS)
@@ -68,8 +81,25 @@ def _pairs(vision_root: Path, audio_root: Path) -> List[Tuple[Path, Path, str]]:
         n = min(len(vis_list), len(aud_list))
         for i in range(n):
             out.append((vis_list[i], aud_list[i], cls))
+
+    if out:
+        return out
+
+    # Global fallback: recursively pair all files by deterministic order.
+    # Useful when folder/class naming differs between audio and vision roots.
+    vis_all = _collect_all_files(vision_root, IMAGE_EXTS)
+    aud_all = _collect_all_files(audio_root, AUDIO_EXTS)
+    n = min(len(vis_all), len(aud_all))
+    for i in range(n):
+        cls = _infer_class_name(vis_all[i], vision_root)
+        out.append((vis_all[i], aud_all[i], cls))
+
     if not out:
-        raise RuntimeError("No paired samples found between vision and audio folders.")
+        raise RuntimeError(
+            "No paired samples found between vision and audio folders. "
+            f"Found {len(_collect_all_files(vision_root, IMAGE_EXTS))} images and "
+            f"{len(_collect_all_files(audio_root, AUDIO_EXTS))} audio files."
+        )
     return out
 
 
