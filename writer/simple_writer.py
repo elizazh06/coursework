@@ -1,9 +1,19 @@
 class SimpleWriter:
-    def __init__(self, logger=None, config=None, run_name="default", log_checkpoints=False):
+    def __init__(
+        self,
+        logger=None,
+        config=None,
+        run_name="default",
+        log_checkpoints=False,
+        loss_names=None,
+        **kwargs,
+    ):
+        del kwargs
         self.logger = logger
         self.config = config
         self.run_name = run_name
         self.log_checkpoints = bool(log_checkpoints)
+        self.loss_names = list(loss_names) if loss_names is not None else []
         self._step = 0
         self._mode = "train"
 
