@@ -34,15 +34,40 @@ def _collect_files(root: Path, exts: set) -> Dict[str, Dict[str, Path]]:
     return by_class
 
 
+def _collect_file_list(root: Path, exts: set) -> Dict[str, List[Path]]:
+    by_class = {}
+    if not root.exists():
+        raise FileNotFoundError(f"Path does not exist: {root}")
+    for class_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        files = sorted(
+            p for p in class_dir.rglob("*") if p.is_file() and p.suffix.lower() in exts
+        )
+        if files:
+            by_class[class_dir.name] = files
+    return by_class
+
+
 def _pairs(vision_root: Path, audio_root: Path) -> List[Tuple[Path, Path, str]]:
     vis = _collect_files(vision_root, IMAGE_EXTS)
     aud = _collect_files(audio_root, AUDIO_EXTS)
+    vis_lists = _collect_file_list(vision_root, IMAGE_EXTS)
+    aud_lists = _collect_file_list(audio_root, AUDIO_EXTS)
     classes = sorted(set(vis.keys()) & set(aud.keys()))
     out = []
     for cls in classes:
         common = sorted(set(vis[cls].keys()) & set(aud[cls].keys()))
-        for stem in common:
-            out.append((vis[cls][stem], aud[cls][stem], cls))
+        if common:
+            for stem in common:
+                out.append((vis[cls][stem], aud[cls][stem], cls))
+            continue
+
+        # Fallback for datasets where paired media filenames differ by stem.
+        # In that case we rely on deterministic sorted order within each class.
+        vis_list = vis_lists.get(cls, [])
+        aud_list = aud_lists.get(cls, [])
+        n = min(len(vis_list), len(aud_list))
+        for i in range(n):
+            out.append((vis_list[i], aud_list[i], cls))
     if not out:
         raise RuntimeError("No paired samples found between vision and audio folders.")
     return out
