@@ -1,0 +1,8 @@
+model:
+  _target_: models.music_avqa_baseline.AVQABaselineModel
+  vocab_size: 5000
+  embed_dim: 256
+  hidden_dim: 512
+  num_classes: 42
+  use_pretrained_backbone: true
+  dropout: 0.2

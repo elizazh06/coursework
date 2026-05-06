@@ -1,12 +1,13 @@
 import warnings
 import argparse
+from pathlib import Path
 
 import torch
-import yaml
 
 from datasets.data_utils import get_dataloaders
 from trainer.inferencer import Inferencer
 from utils.config import ConfigNode
+from utils.config_loader import apply_dotlist_overrides, load_composed_config
 from utils.factory import instantiate
 from utils.init_utils import set_random_seed
 from utils.io_utils import ROOT_PATH
@@ -14,7 +15,7 @@ from utils.io_utils import ROOT_PATH
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def main(config_path):
+def main(config_path, overrides=None):
     """
     Main script for inference. Instantiates the model, metrics, and
     dataloaders. Runs Inferencer to calculate metrics and (or)
@@ -23,8 +24,13 @@ def main(config_path):
     Args:
         config (DictConfig): hydra experiment config.
     """
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = ConfigNode(yaml.safe_load(f))
+    raw_config = load_composed_config(config_path)
+    raw_config = apply_dotlist_overrides(
+        raw_config,
+        overrides or [],
+        config_dir=Path(config_path).parent,
+    )
+    config = ConfigNode(raw_config)
 
     set_random_seed(config.inferencer.seed)
 
@@ -70,5 +76,5 @@ def main(config_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/inference.yaml")
-    args = parser.parse_args()
-    main(args.config)
+    args, unknown = parser.parse_known_args()
+    main(args.config, overrides=unknown)

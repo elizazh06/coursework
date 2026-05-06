@@ -1,0 +1,5 @@
+model:
+  _target_: models.advance_baseline.ADVANCEBaselineModel
+  hidden_dim: 256
+  dropout: 0.2
+  use_pretrained_backbone: true

@@ -1,3 +1,8 @@
+defaults:
+  - dataset: advance
+  - model: advance_baseline
+  - _self_
+
 trainer:
   seed: 42
   device: auto
@@ -16,36 +21,9 @@ trainer:
 
 writer:
   _target_: writer.simple_writer.SimpleWriter
-  run_name: baseline_run
+  run_name: train_run
   log_checkpoints: false
   loss_names: ["loss"]
-
-dataset:
-  module: music_avqa
-  name: MusicAVQADataset
-  batch_size: 8
-  eval_batch_size: 8
-  num_workers: 2
-  pin_memory: false
-  params:
-    root_dir: data/music_avqa
-    split: train
-    max_len: 16
-    prepare_data: false
-    strict_media: false
-    max_samples: null
-    use_official_features: true
-    features:
-      audio_dir: data/music_avqa/feats/vggish
-      visual_dir: data/music_avqa/feats/res18_14x14
-
-model:
-  _target_: models.music_avqa_author_baseline.AVQAAuthorBaselineModel
-  vocab_size: 5000
-  hidden_dim: 512
-  num_classes: 42
-  dropout: 0.1
-  num_heads: 4
 
 loss_function:
   _target_: losses.cross_entropy.CrossEntropyLossWrapper
@@ -60,8 +38,8 @@ metrics:
 
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 3e-4
-  weight_decay: 1e-4
+  lr: 3.0e-4
+  weight_decay: 1.0e-4
 
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.StepLR

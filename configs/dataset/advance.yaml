@@ -1,0 +1,17 @@
+dataset:
+  module: advance
+  name: ADVANCEDataset
+  batch_size: 16
+  eval_batch_size: 64
+  num_workers: 2
+  pin_memory: false
+  params:
+    vision_root: /content/drive/MyDrive/zenodo_dataset/ADVANCE_vision
+    audio_root: /content/drive/MyDrive/zenodo_dataset/ADVANCE_sound
+    sample_rate: 16000
+    n_mels: 128
+    max_audio_seconds: 5.0
+    image_size: 224
+    val_ratio: 0.1
+    test_ratio: 0.1
+    split_seed: 42
