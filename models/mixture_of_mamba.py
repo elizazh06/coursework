@@ -151,6 +151,7 @@ class MixtureOfMambaModel(nn.Module):
         self,
         num_classes=13,
         d_model=256,
+        hidden_dim=None,
         n_layers=4,
         d_state=64,
         conv_kernel=3,
@@ -162,8 +163,11 @@ class MixtureOfMambaModel(nn.Module):
         vocab_size=5000,
         max_video_tokens=32,
         max_audio_tokens=64,
+        **_,
     ):
         super().__init__()
+        if hidden_dim is not None:
+            d_model = int(hidden_dim)
         self.max_video_tokens = max_video_tokens
         self.max_audio_tokens = max_audio_tokens
 
