@@ -1,0 +1,15 @@
+model:
+  _target_: models.mixture_of_mamba.MixtureOfMambaModel
+  num_classes: 13
+  d_model: 256
+  n_layers: 4
+  d_state: 64
+  conv_kernel: 3
+  expand: 2
+  ff_mult: 4
+  num_experts: 4
+  top_k: 2
+  dropout: 0.1
+  vocab_size: 5000
+  max_video_tokens: 32
+  max_audio_tokens: 64

@@ -1,7 +1,0 @@
-model:
-  _target_: models.music_avqa_author_baseline.AVQAAuthorBaselineModel
-  vocab_size: 5000
-  hidden_dim: 512
-  num_classes: 42
-  dropout: 0.1
-  num_heads: 4

@@ -13,6 +13,7 @@ trainer:
   early_stop: 10
   max_grad_norm: 1.0
   skip_oom: true
+  save_last: true
   device_tensors: ["video", "audio", "question", "label"]
   resume_from: null
   from_pretrained: null

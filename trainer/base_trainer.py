@@ -181,11 +181,16 @@ class BaseTrainer:
                 logs, not_improved_count
             )
 
-            if epoch % self.save_period == 0 or best:
-                self._save_checkpoint(epoch, save_best=best, only_best=True)
+            # Save only the best checkpoint during the training loop.
+            if best:
+                self._save_checkpoint(epoch, save_best=True, only_best=True)
 
             if stop_process:  # early_stop
                 break
+
+        # Optionally keep one "last" checkpoint for easy resume.
+        if self.cfg_trainer.get("save_last", True):
+            self._save_last_checkpoint(self._last_epoch)
 
     def _train_epoch(self, epoch):
         """
@@ -497,6 +502,29 @@ class BaseTrainer:
             if self.config.writer.log_checkpoints:
                 self.writer.add_checkpoint(best_path, str(self.checkpoint_dir.parent))
             self.logger.info("Saving current best: model_best.pth ...")
+
+    def _save_last_checkpoint(self, epoch):
+        """
+        Save the last training state into a fixed checkpoint file.
+
+        Args:
+            epoch (int): current epoch number.
+        """
+        arch = type(self.model).__name__
+        state = {
+            "arch": arch,
+            "epoch": epoch,
+            "state_dict": self.model.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+            "lr_scheduler": self.lr_scheduler.state_dict(),
+            "monitor_best": self.mnt_best,
+            "config": self.config,
+        }
+        last_path = str(self.checkpoint_dir / "model_last.pth")
+        torch.save(state, last_path)
+        if self.config.writer.log_checkpoints:
+            self.writer.add_checkpoint(last_path, str(self.checkpoint_dir.parent))
+        self.logger.info("Saving last checkpoint: model_last.pth ...")
 
     def _resume_checkpoint(self, resume_path):
         """
