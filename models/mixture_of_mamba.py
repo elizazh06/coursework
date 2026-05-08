@@ -372,11 +372,27 @@ class MixtureOfMambaModel(nn.Module):
             )
             return
 
-        hf_model = AutoModelForCausalLM.from_pretrained(
-            hf_model_name,
-            trust_remote_code=True,
-        )
-        src_state = hf_model.state_dict()
+        src_state = None
+        try:
+            hf_model = AutoModelForCausalLM.from_pretrained(
+                hf_model_name,
+                trust_remote_code=True,
+            )
+            src_state = hf_model.state_dict()
+        except Exception as e:
+            print(
+                "[MixtureOfMambaModel] AutoModelForCausalLM loading failed, "
+                "trying direct safetensors download from Hugging Face. "
+                f"Original error: {e}"
+            )
+            src_state = self._load_hf_state_dict_without_model_init(hf_model_name)
+            if src_state is None:
+                print(
+                    "[MixtureOfMambaModel] Failed to load HF pretrained weights; "
+                    "continuing with random initialization."
+                )
+                return
+
         dst_state = self.state_dict()
 
         mapped = {}
@@ -413,6 +429,51 @@ class MixtureOfMambaModel(nn.Module):
             f"[MixtureOfMambaModel] Loaded {len(mapped)} tensors "
             f"from HF model: {hf_model_name}"
         )
+
+    def _load_hf_state_dict_without_model_init(self, hf_model_name):
+        """
+        Load HF checkpoint tensors directly (without constructing HF model),
+        which avoids runtime coupling to specific mamba_ssm/transformers APIs.
+        """
+        try:
+            from huggingface_hub import hf_hub_download
+        except ImportError:
+            print(
+                "[MixtureOfMambaModel] `huggingface_hub` is missing; "
+                "cannot download HF checkpoint tensors directly."
+            )
+            return None
+
+        # Prefer safetensors first, then fallback to pytorch bin.
+        try:
+            safetensors_path = hf_hub_download(
+                repo_id=hf_model_name,
+                filename="model.safetensors",
+            )
+            try:
+                from safetensors.torch import load_file as safe_load_file
+            except ImportError:
+                print(
+                    "[MixtureOfMambaModel] `safetensors` is missing; "
+                    "cannot read model.safetensors."
+                )
+                return None
+            return safe_load_file(safetensors_path)
+        except Exception:
+            pass
+
+        try:
+            bin_path = hf_hub_download(
+                repo_id=hf_model_name,
+                filename="pytorch_model.bin",
+            )
+            return torch.load(bin_path, map_location="cpu")
+        except Exception as e:
+            print(
+                "[MixtureOfMambaModel] Could not download HF checkpoint tensors "
+                f"from {hf_model_name}. Error: {e}"
+            )
+            return None
 
     def _encode_video(self, video):
         bsz, timesteps = video.shape[:2]
