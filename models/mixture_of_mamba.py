@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -68,6 +70,31 @@ class SelectiveStateSpaceMixer(nn.Module):
         return self.out_proj(y)
 
 
+class OfficialMambaMixer(nn.Module):
+    """
+    Wrapper around official mamba-ssm block.
+    """
+
+    def __init__(self, d_model, d_state=64, conv_kernel=3, expand=2):
+        super().__init__()
+        try:
+            from mamba_ssm import Mamba
+        except ImportError as e:
+            raise ImportError(
+                "mamba-ssm is not installed. Install with: "
+                "`pip install mamba-ssm --no-build-isolation`"
+            ) from e
+        self.mamba = Mamba(
+            d_model=d_model,
+            d_state=d_state,
+            d_conv=conv_kernel,
+            expand=expand,
+        )
+
+    def forward(self, x):
+        return self.mamba(x)
+
+
 class MoEFeedForward(nn.Module):
     def __init__(self, d_model, ff_mult=4, num_experts=4, top_k=2, dropout=0.1):
         super().__init__()
@@ -113,15 +140,24 @@ class MixtureOfMambaBlock(nn.Module):
         num_experts=4,
         top_k=2,
         dropout=0.1,
+        mixer_backend="custom",
     ):
         super().__init__()
         self.norm1 = RMSNorm(d_model)
-        self.mixer = SelectiveStateSpaceMixer(
-            d_model=d_model,
-            d_state=d_state,
-            conv_kernel=conv_kernel,
-            expand=expand,
-        )
+        if mixer_backend == "official":
+            self.mixer = OfficialMambaMixer(
+                d_model=d_model,
+                d_state=d_state,
+                conv_kernel=conv_kernel,
+                expand=expand,
+            )
+        else:
+            self.mixer = SelectiveStateSpaceMixer(
+                d_model=d_model,
+                d_state=d_state,
+                conv_kernel=conv_kernel,
+                expand=expand,
+            )
         self.norm2 = RMSNorm(d_model)
         self.moe = MoEFeedForward(
             d_model=d_model,
@@ -150,7 +186,7 @@ class MixtureOfMambaModel(nn.Module):
     def __init__(
         self,
         num_classes=13,
-        d_model=256,
+        d_model=768,
         hidden_dim=None,
         n_layers=4,
         d_state=64,
@@ -163,6 +199,12 @@ class MixtureOfMambaModel(nn.Module):
         vocab_size=5000,
         max_video_tokens=32,
         max_audio_tokens=64,
+        use_official_mamba_ssm=True,
+        hf_pretrained_mamba_model="state-spaces/mamba-130m-hf",
+        auto_load_pretrained_mamba=False,
+        pretrained_mamba_path=None,
+        pretrained_mamba_prefix="",
+        freeze_mamba=False,
         **_,
     ):
         super().__init__()
@@ -186,6 +228,16 @@ class MixtureOfMambaModel(nn.Module):
         self.modality_embed = nn.Parameter(torch.zeros(1, 4, d_model))
         self.pos_embed = nn.Parameter(torch.zeros(1, 1 + max_video_tokens + max_audio_tokens + 1, d_model))
 
+        if use_official_mamba_ssm:
+            # Fail early with a clear message to keep startup behavior deterministic.
+            try:
+                import mamba_ssm  # noqa: F401
+            except ImportError as e:
+                raise ImportError(
+                    "Official Mamba backend is enabled by default but `mamba-ssm` is missing. "
+                    "Install with: `pip install mamba-ssm --no-build-isolation`"
+                ) from e
+
         self.blocks = nn.ModuleList(
             [
                 MixtureOfMambaBlock(
@@ -197,6 +249,7 @@ class MixtureOfMambaModel(nn.Module):
                     num_experts=num_experts,
                     top_k=top_k,
                     dropout=dropout,
+                    mixer_backend="official" if use_official_mamba_ssm else "custom",
                 )
                 for _ in range(n_layers)
             ]
@@ -208,6 +261,158 @@ class MixtureOfMambaModel(nn.Module):
         nn.init.trunc_normal_(self.cls_token, std=0.02)
         nn.init.trunc_normal_(self.modality_embed, std=0.02)
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
+
+        if hf_pretrained_mamba_model:
+            self._load_pretrained_mamba_from_hf(hf_pretrained_mamba_model)
+
+        auto_path = None
+        if auto_load_pretrained_mamba and not pretrained_mamba_path:
+            auto_path = self._find_default_mamba_checkpoint()
+
+        effective_pretrained_path = pretrained_mamba_path or auto_path
+        if effective_pretrained_path:
+            self._load_pretrained_mamba(
+                pretrained_path=effective_pretrained_path,
+                prefix=pretrained_mamba_prefix,
+            )
+        elif auto_load_pretrained_mamba:
+            print(
+                "[MixtureOfMambaModel] Auto pretrained Mamba checkpoint was not found. "
+                "Training starts from random initialization for Mamba blocks."
+            )
+        if freeze_mamba:
+            self._freeze_mamba_blocks()
+
+    def _find_default_mamba_checkpoint(self):
+        """
+        Find a default Mamba checkpoint in common project checkpoint locations.
+        """
+        project_root = Path(__file__).resolve().parents[1]
+        candidates = [
+            project_root / "checkpoints" / "mixture_of_mamba" / "model_best.pth",
+            project_root / "checkpoints" / "mixture_of_mamba" / "model_last.pth",
+            project_root / "checkpoints" / "mixture_of_mamba_advance" / "model_best.pth",
+            project_root / "checkpoints" / "mixture_of_mamba_advance" / "model_last.pth",
+            project_root / "checkpoints" / "mamba" / "model_best.pth",
+            project_root / "checkpoints" / "mamba" / "model_last.pth",
+        ]
+        for path in candidates:
+            if path.exists():
+                return str(path)
+        return None
+
+    def _freeze_mamba_blocks(self):
+        for p in self.blocks.parameters():
+            p.requires_grad = False
+        if hasattr(self, "norm"):
+            for p in self.norm.parameters():
+                p.requires_grad = False
+
+    def _load_pretrained_mamba(self, pretrained_path, prefix=""):
+        """
+        Load only Mamba-related weights (blocks + final norm) from checkpoint.
+        Uses partial loading by matching both key names and tensor shapes.
+        """
+        ckpt = torch.load(pretrained_path, map_location="cpu")
+        src_state = ckpt.get("state_dict", ckpt)
+        if not isinstance(src_state, dict):
+            print(
+                f"[MixtureOfMambaModel] Unexpected checkpoint format at {pretrained_path}. "
+                "Expected dict or dict with 'state_dict'. Skipping pretrained load."
+            )
+            return
+
+        if prefix:
+            normalized = {}
+            pref = prefix if prefix.endswith(".") else f"{prefix}."
+            for k, v in src_state.items():
+                if k.startswith(pref):
+                    normalized[k[len(pref):]] = v
+            src_state = normalized
+
+        dst_state = self.state_dict()
+        allowed_prefixes = ("blocks.", "norm.")
+        to_load = {}
+        for k, v in src_state.items():
+            if not k.startswith(allowed_prefixes):
+                continue
+            if k in dst_state and dst_state[k].shape == v.shape:
+                to_load[k] = v
+
+        if not to_load:
+            print(
+                "[MixtureOfMambaModel] No matching Mamba block weights found. "
+                "Check checkpoint key names/shapes and pretrained_mamba_prefix."
+            )
+            return
+
+        self.load_state_dict(to_load, strict=False)
+        print(
+            f"[MixtureOfMambaModel] Loaded {len(to_load)} tensors "
+            f"from pretrained Mamba checkpoint: {pretrained_path}"
+        )
+
+    def _load_pretrained_mamba_from_hf(self, hf_model_name):
+        """
+        Load Mamba mixer weights from an HF pretrained model from state-spaces.
+        This maps language-model backbone mixer layers into this model's mixers.
+        """
+        try:
+            from transformers import AutoModelForCausalLM
+        except ImportError as e:
+            raise ImportError(
+                "transformers is required for HF Mamba loading. "
+                "Install with `pip install transformers`."
+            ) from e
+
+        if not any(isinstance(block.mixer, OfficialMambaMixer) for block in self.blocks):
+            print(
+                "[MixtureOfMambaModel] HF Mamba weight loading expects official mamba-ssm backend. "
+                "Skipping because current model uses custom mixer."
+            )
+            return
+
+        hf_model = AutoModelForCausalLM.from_pretrained(
+            hf_model_name,
+            trust_remote_code=True,
+        )
+        src_state = hf_model.state_dict()
+        dst_state = self.state_dict()
+
+        mapped = {}
+        layer_idx = 0
+        while layer_idx < len(self.blocks):
+            src_prefix = f"backbone.layers.{layer_idx}.mixer."
+            dst_prefix = f"blocks.{layer_idx}.mixer.mamba."
+            layer_has_any = False
+            for src_key, value in src_state.items():
+                if not src_key.startswith(src_prefix):
+                    continue
+                layer_has_any = True
+                dst_key = dst_prefix + src_key[len(src_prefix) :]
+                if dst_key in dst_state and dst_state[dst_key].shape == value.shape:
+                    mapped[dst_key] = value
+            if not layer_has_any:
+                break
+            layer_idx += 1
+
+        # Try to map final RMSNorm if shapes match.
+        if "backbone.norm_f.weight" in src_state and "norm.weight" in dst_state:
+            if src_state["backbone.norm_f.weight"].shape == dst_state["norm.weight"].shape:
+                mapped["norm.weight"] = src_state["backbone.norm_f.weight"]
+
+        if not mapped:
+            print(
+                "[MixtureOfMambaModel] Could not map any weights from HF Mamba model. "
+                "Likely hidden size mismatch (e.g., HF 768/1024/...) vs model d_model."
+            )
+            return
+
+        self.load_state_dict(mapped, strict=False)
+        print(
+            f"[MixtureOfMambaModel] Loaded {len(mapped)} tensors "
+            f"from HF model: {hf_model_name}"
+        )
 
     def _encode_video(self, video):
         bsz, timesteps = video.shape[:2]
