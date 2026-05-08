@@ -15,3 +15,8 @@ dataset:
     val_ratio: 0.1
     test_ratio: 0.1
     split_seed: 42
+    use_cache: true
+    prepare_cache_if_missing: true
+    rebuild_cache: false
+    cache_root: /content/drive/MyDrive/zenodo_dataset/ADVANCE_cache
+    cache_prefix: advance_cache
