@@ -526,12 +526,15 @@ class MixtureOfMambaModel(nn.Module):
         q_token = q_token + self.modality_embed[:, 2:3]
         cls = cls + self.modality_embed[:, 3:4]
 
-        x = torch.cat([cls, v_tokens, a_tokens, q_token], dim=1)
+        # CLS token is placed LAST so that the causal (left-to-right) Mamba
+        # mixer can propagate information from all modalities into it before
+        # the final classification read-out.
+        x = torch.cat([v_tokens, a_tokens, q_token, cls], dim=1)
         x = x + self.pos_embed[:, : x.size(1)]
         x = self.dropout(x)
 
         for block in self.blocks:
             x = block(x)
 
-        x = self.norm(x[:, 0])
+        x = self.norm(x[:, -1])
         return self.head(x)

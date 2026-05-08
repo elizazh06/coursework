@@ -248,6 +248,9 @@ class BaseTrainer:
 
         logs = last_train_metrics
 
+        if self.lr_scheduler is not None:
+            self.lr_scheduler.step()
+
         # Run val/test
         for part, dataloader in self.evaluation_dataloaders.items():
             val_logs = self._evaluation_epoch(epoch, part, dataloader)
