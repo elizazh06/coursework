@@ -42,6 +42,8 @@ def get_dataloaders(config, device):
     eval_batch_size = int(getattr(dataset_cfg, "eval_batch_size", batch_size))
     num_workers = int(getattr(dataset_cfg, "num_workers", 0))
     pin_memory = bool(getattr(dataset_cfg, "pin_memory", False))
+    worker_timeout = int(getattr(dataset_cfg, "timeout", 0))
+    persistent_workers = num_workers > 0 and bool(getattr(dataset_cfg, "persistent_workers", True))
 
     dataloaders = {
         "train": DataLoader(
@@ -51,6 +53,8 @@ def get_dataloaders(config, device):
             num_workers=num_workers,
             pin_memory=pin_memory,
             collate_fn=train_dataset.collate_batch,
+            timeout=worker_timeout,
+            persistent_workers=persistent_workers,
         ),
         "val": DataLoader(
             val_dataset,
@@ -59,6 +63,8 @@ def get_dataloaders(config, device):
             num_workers=num_workers,
             pin_memory=pin_memory,
             collate_fn=val_dataset.collate_batch,
+            timeout=worker_timeout,
+            persistent_workers=persistent_workers,
         ),
         "test": DataLoader(
             test_dataset,
@@ -67,6 +73,8 @@ def get_dataloaders(config, device):
             num_workers=num_workers,
             pin_memory=pin_memory,
             collate_fn=test_dataset.collate_batch,
+            timeout=worker_timeout,
+            persistent_workers=persistent_workers,
         ),
     }
 

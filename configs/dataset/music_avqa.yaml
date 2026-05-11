@@ -3,7 +3,8 @@ dataset:
   name: MusicAVQADataset
   batch_size: 8
   eval_batch_size: 8
-  num_workers: 0
+  num_workers: 2
+  timeout: 120
   pin_memory: false
   params:
     root_dir: data/music_avqa

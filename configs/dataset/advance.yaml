@@ -3,7 +3,8 @@ dataset:
   name: ADVANCEDataset
   batch_size: 16
   eval_batch_size: 64
-  num_workers: 0
+  num_workers: 2
+  timeout: 120
   pin_memory: false
   params:
     vision_root: /content/drive/MyDrive/zenodo_dataset/ADVANCE_vision
