@@ -1,0 +1,262 @@
+2026-05-11 08:18:39,072 | INFO | MixtureOfMambaModel(
+  (image_stem): Sequential(
+    (0): Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
+    (1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (2): GELU(approximate='none')
+    (3): AdaptiveAvgPool2d(output_size=(1, 1))
+  )
+  (video_proj): LazyLinear(in_features=0, out_features=256, bias=True)
+  (audio_proj): LazyLinear(in_features=0, out_features=256, bias=True)
+  (question_embedding): Embedding(5000, 256)
+  (question_proj): Linear(in_features=256, out_features=256, bias=True)
+  (blocks): ModuleList(
+    (0-3): 4 x MixtureOfMambaBlock(
+      (norm1): RMSNorm()
+      (mixer): OfficialMambaMixer(
+        (mamba): Mamba(
+          (in_proj): Linear(in_features=256, out_features=1024, bias=False)
+          (conv1d): Conv1d(512, 512, kernel_size=(4,), stride=(1,), padding=(3,), groups=512)
+          (act): SiLU()
+          (x_proj): Linear(in_features=512, out_features=48, bias=False)
+          (dt_proj): Linear(in_features=16, out_features=512, bias=True)
+          (out_proj): Linear(in_features=512, out_features=256, bias=False)
+        )
+      )
+      (norm2): RMSNorm()
+      (moe): MoEFeedForward(
+        (gate): Linear(in_features=256, out_features=4, bias=True)
+        (experts): ModuleList(
+          (0-3): 4 x Sequential(
+            (0): Linear(in_features=256, out_features=1024, bias=True)
+            (1): GELU(approximate='none')
+            (2): Dropout(p=0.1, inplace=False)
+            (3): Linear(in_features=1024, out_features=256, bias=True)
+          )
+        )
+      )
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+  )
+  (norm): RMSNorm()
+  (head): Linear(in_features=256, out_features=13, bias=True)
+  (dropout): Dropout(p=0.1, inplace=False)
+)
+2026-05-11 08:30:27,544 | INFO | Saving model on keyboard interrupt
+2026-05-11 08:30:27,792 | INFO | Saving checkpoint: /content/coursework/checkpoints/mixture_of_mamba_advance/checkpoint-epoch1.pth ...
+2026-05-11 08:31:17,609 | INFO | MixtureOfMambaModel(
+  (image_stem): Sequential(
+    (0): Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3))
+    (1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (2): GELU(approximate='none')
+    (3): AdaptiveAvgPool2d(output_size=(1, 1))
+  )
+  (video_proj): LazyLinear(in_features=0, out_features=256, bias=True)
+  (audio_proj): LazyLinear(in_features=0, out_features=256, bias=True)
+  (question_embedding): Embedding(5000, 256)
+  (question_proj): Linear(in_features=256, out_features=256, bias=True)
+  (blocks): ModuleList(
+    (0-3): 4 x MixtureOfMambaBlock(
+      (norm1): RMSNorm()
+      (mixer): OfficialMambaMixer(
+        (mamba): Mamba(
+          (in_proj): Linear(in_features=256, out_features=1024, bias=False)
+          (conv1d): Conv1d(512, 512, kernel_size=(4,), stride=(1,), padding=(3,), groups=512)
+          (act): SiLU()
+          (x_proj): Linear(in_features=512, out_features=48, bias=False)
+          (dt_proj): Linear(in_features=16, out_features=512, bias=True)
+          (out_proj): Linear(in_features=512, out_features=256, bias=False)
+        )
+      )
+      (norm2): RMSNorm()
+      (moe): MoEFeedForward(
+        (gate): Linear(in_features=256, out_features=4, bias=True)
+        (experts): ModuleList(
+          (0-3): 4 x Sequential(
+            (0): Linear(in_features=256, out_features=1024, bias=True)
+            (1): GELU(approximate='none')
+            (2): Dropout(p=0.1, inplace=False)
+            (3): Linear(in_features=1024, out_features=256, bias=True)
+          )
+        )
+      )
+      (dropout): Dropout(p=0.1, inplace=False)
+    )
+  )
+  (norm): RMSNorm()
+  (head): Linear(in_features=256, out_features=13, bias=True)
+  (dropout): Dropout(p=0.1, inplace=False)
+)
+2026-05-11 09:03:45,504 | INFO |     epoch          : 1
+2026-05-11 09:03:45,505 | INFO |     loss           : 2.2913374400138853
+2026-05-11 09:03:45,505 | INFO |     grad_norm      : 0.9999997305870056
+2026-05-11 09:03:45,505 | INFO |     accuracy       : 0.24875
+2026-05-11 09:03:45,505 | INFO |     val_loss       : 2.2841612100601196
+2026-05-11 09:03:45,506 | INFO |     val_accuracy   : 0.234375
+2026-05-11 09:03:45,506 | INFO |     test_loss      : 2.2822528183460236
+2026-05-11 09:03:45,506 | INFO |     test_accuracy  : 0.216796875
+2026-05-11 09:03:45,797 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:04:36,233 | INFO |     epoch          : 2
+2026-05-11 09:04:36,234 | INFO |     loss           : 1.9449482917785645
+2026-05-11 09:04:36,235 | INFO |     grad_norm      : 0.9999997913837433
+2026-05-11 09:04:36,235 | INFO |     accuracy       : 0.34375
+2026-05-11 09:04:36,235 | INFO |     val_loss       : 2.0140200033783913
+2026-05-11 09:04:36,235 | INFO |     val_accuracy   : 0.3367187511175871
+2026-05-11 09:04:36,235 | INFO |     test_loss      : 2.0268910452723503
+2026-05-11 09:04:36,235 | INFO |     test_accuracy  : 0.3248697919771075
+2026-05-11 09:04:36,631 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:05:22,634 | INFO |     epoch          : 3
+2026-05-11 09:05:22,635 | INFO |     loss           : 1.7958147311210633
+2026-05-11 09:05:22,635 | INFO |     grad_norm      : 0.9999997818470001
+2026-05-11 09:05:22,635 | INFO |     accuracy       : 0.415
+2026-05-11 09:05:22,635 | INFO |     val_loss       : 1.844485804438591
+2026-05-11 09:05:22,635 | INFO |     val_accuracy   : 0.38020833395421505
+2026-05-11 09:05:22,635 | INFO |     test_loss      : 1.9135645627975464
+2026-05-11 09:05:22,636 | INFO |     test_accuracy  : 0.34817708376795053
+2026-05-11 09:05:22,946 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:06:06,002 | INFO |     epoch          : 4
+2026-05-11 09:06:06,003 | INFO |     loss           : 1.6467377281188964
+2026-05-11 09:06:06,003 | INFO |     grad_norm      : 0.9999997866153717
+2026-05-11 09:06:06,004 | INFO |     accuracy       : 0.4525
+2026-05-11 09:06:06,004 | INFO |     val_loss       : 1.7570130228996277
+2026-05-11 09:06:06,004 | INFO |     val_accuracy   : 0.39361979253590107
+2026-05-11 09:06:06,004 | INFO |     test_loss      : 1.7489241175353527
+2026-05-11 09:06:06,004 | INFO |     test_accuracy  : 0.38411458395421505
+2026-05-11 09:06:06,470 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:06:46,005 | INFO |     epoch          : 5
+2026-05-11 09:06:46,005 | INFO |     loss           : 1.553040018081665
+2026-05-11 09:06:46,006 | INFO |     grad_norm      : 0.9999998140335083
+2026-05-11 09:06:46,006 | INFO |     accuracy       : 0.46125
+2026-05-11 09:06:46,006 | INFO |     val_loss       : 1.5247259885072708
+2026-05-11 09:06:46,006 | INFO |     val_accuracy   : 0.46471354365348816
+2026-05-11 09:06:46,006 | INFO |     test_loss      : 1.5411508679389954
+2026-05-11 09:06:46,006 | INFO |     test_accuracy  : 0.48815104365348816
+2026-05-11 09:06:46,297 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:07:25,265 | INFO |     epoch          : 6
+2026-05-11 09:07:25,275 | INFO |     loss           : 1.422479772567749
+2026-05-11 09:07:25,275 | INFO |     grad_norm      : 0.9999998414516449
+2026-05-11 09:07:25,275 | INFO |     accuracy       : 0.52125
+2026-05-11 09:07:25,275 | INFO |     val_loss       : 1.500211589038372
+2026-05-11 09:07:25,275 | INFO |     val_accuracy   : 0.4794270843267441
+2026-05-11 09:07:25,275 | INFO |     test_loss      : 1.4958077147603035
+2026-05-11 09:07:25,275 | INFO |     test_accuracy  : 0.48906250298023224
+2026-05-11 09:07:25,769 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:08:03,969 | INFO |     epoch          : 7
+2026-05-11 09:08:03,970 | INFO |     loss           : 1.245180585384369
+2026-05-11 09:08:03,970 | INFO |     grad_norm      : 0.9999998271465301
+2026-05-11 09:08:03,970 | INFO |     accuracy       : 0.59125
+2026-05-11 09:08:03,970 | INFO |     val_loss       : 1.399301454424858
+2026-05-11 09:08:03,970 | INFO |     val_accuracy   : 0.5369791686534882
+2026-05-11 09:08:03,970 | INFO |     test_loss      : 1.4778833836317062
+2026-05-11 09:08:03,970 | INFO |     test_accuracy  : 0.5053385458886623
+2026-05-11 09:08:04,451 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:08:41,732 | INFO |     epoch          : 8
+2026-05-11 09:08:41,732 | INFO |     loss           : 1.1092041087150575
+2026-05-11 09:08:41,732 | INFO |     grad_norm      : 0.9999998342990876
+2026-05-11 09:08:41,732 | INFO |     accuracy       : 0.62625
+2026-05-11 09:08:41,732 | INFO |     val_loss       : 1.1917567029595375
+2026-05-11 09:08:41,732 | INFO |     val_accuracy   : 0.5792968794703484
+2026-05-11 09:08:41,732 | INFO |     test_loss      : 1.278927095234394
+2026-05-11 09:08:41,732 | INFO |     test_accuracy  : 0.5856770873069763
+2026-05-11 09:08:42,010 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:09:19,457 | INFO |     epoch          : 9
+2026-05-11 09:09:19,458 | INFO |     loss           : 0.9733908104896546
+2026-05-11 09:09:19,458 | INFO |     grad_norm      : 0.9999998700618744
+2026-05-11 09:09:19,458 | INFO |     accuracy       : 0.6625
+2026-05-11 09:09:19,458 | INFO |     val_loss       : 1.3574844673275948
+2026-05-11 09:09:19,458 | INFO |     val_accuracy   : 0.5756510458886623
+2026-05-11 09:09:19,458 | INFO |     test_loss      : 1.4427395798265934
+2026-05-11 09:09:19,458 | INFO |     test_accuracy  : 0.5436197929084301
+2026-05-11 09:09:56,377 | INFO |     epoch          : 10
+2026-05-11 09:09:56,377 | INFO |     loss           : 0.8166077589988708
+2026-05-11 09:09:56,377 | INFO |     grad_norm      : 0.999999862909317
+2026-05-11 09:09:56,377 | INFO |     accuracy       : 0.73
+2026-05-11 09:09:56,377 | INFO |     val_loss       : 1.1109556034207344
+2026-05-11 09:09:56,377 | INFO |     val_accuracy   : 0.6570312529802322
+2026-05-11 09:09:56,377 | INFO |     test_loss      : 1.0993775576353073
+2026-05-11 09:09:56,377 | INFO |     test_accuracy  : 0.6470052152872086
+2026-05-11 09:09:56,647 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:10:32,244 | INFO |     epoch          : 11
+2026-05-11 09:10:32,244 | INFO |     loss           : 0.5746513786911964
+2026-05-11 09:10:32,244 | INFO |     grad_norm      : 0.9999998319149017
+2026-05-11 09:10:32,244 | INFO |     accuracy       : 0.8075
+2026-05-11 09:10:32,244 | INFO |     val_loss       : 0.976930595934391
+2026-05-11 09:10:32,244 | INFO |     val_accuracy   : 0.6829427108168602
+2026-05-11 09:10:32,244 | INFO |     test_loss      : 1.037725806236267
+2026-05-11 09:10:32,245 | INFO |     test_accuracy  : 0.6390625014901161
+2026-05-11 09:10:32,655 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:11:09,868 | INFO |     epoch          : 12
+2026-05-11 09:11:09,868 | INFO |     loss           : 0.4444035740196705
+2026-05-11 09:11:09,868 | INFO |     grad_norm      : 0.9999998497962952
+2026-05-11 09:11:09,868 | INFO |     accuracy       : 0.83875
+2026-05-11 09:11:09,868 | INFO |     val_loss       : 1.1335199475288391
+2026-05-11 09:11:09,868 | INFO |     val_accuracy   : 0.7078125029802322
+2026-05-11 09:11:09,868 | INFO |     test_loss      : 1.0922932103276253
+2026-05-11 09:11:09,868 | INFO |     test_accuracy  : 0.6707031279802322
+2026-05-11 09:11:10,206 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:11:47,638 | INFO |     epoch          : 13
+2026-05-11 09:11:47,638 | INFO |     loss           : 0.40169007778167726
+2026-05-11 09:11:47,638 | INFO |     grad_norm      : 0.9999998486042023
+2026-05-11 09:11:47,638 | INFO |     accuracy       : 0.86875
+2026-05-11 09:11:47,638 | INFO |     val_loss       : 1.0184742361307144
+2026-05-11 09:11:47,638 | INFO |     val_accuracy   : 0.6984375044703484
+2026-05-11 09:11:47,638 | INFO |     test_loss      : 1.0549024268984795
+2026-05-11 09:11:47,638 | INFO |     test_accuracy  : 0.6878906264901161
+2026-05-11 09:12:24,420 | INFO |     epoch          : 14
+2026-05-11 09:12:24,420 | INFO |     loss           : 0.3652326275408268
+2026-05-11 09:12:24,420 | INFO |     grad_norm      : 0.9999998354911804
+2026-05-11 09:12:24,420 | INFO |     accuracy       : 0.88375
+2026-05-11 09:12:24,420 | INFO |     val_loss       : 1.120594136416912
+2026-05-11 09:12:24,421 | INFO |     val_accuracy   : 0.6846354231238365
+2026-05-11 09:12:24,421 | INFO |     test_loss      : 1.1337808817625046
+2026-05-11 09:12:24,421 | INFO |     test_accuracy  : 0.6865885481238365
+2026-05-11 09:13:00,192 | INFO |     epoch          : 15
+2026-05-11 09:13:00,193 | INFO |     loss           : 0.29595284689217805
+2026-05-11 09:13:00,193 | INFO |     grad_norm      : 0.9964727771282196
+2026-05-11 09:13:00,194 | INFO |     accuracy       : 0.9075
+2026-05-11 09:13:00,194 | INFO |     val_loss       : 1.0969455614686012
+2026-05-11 09:13:00,194 | INFO |     val_accuracy   : 0.7002604231238365
+2026-05-11 09:13:00,194 | INFO |     test_loss      : 1.1438893675804138
+2026-05-11 09:13:00,194 | INFO |     test_accuracy  : 0.7018229216337204
+2026-05-11 09:13:37,907 | INFO |     epoch          : 16
+2026-05-11 09:13:37,907 | INFO |     loss           : 0.22016941968351603
+2026-05-11 09:13:37,907 | INFO |     grad_norm      : 0.9999998235702514
+2026-05-11 09:13:37,907 | INFO |     accuracy       : 0.92875
+2026-05-11 09:13:37,907 | INFO |     val_loss       : 1.1346105188131332
+2026-05-11 09:13:37,908 | INFO |     val_accuracy   : 0.7084635496139526
+2026-05-11 09:13:37,908 | INFO |     test_loss      : 1.0499075129628181
+2026-05-11 09:13:37,908 | INFO |     test_accuracy  : 0.7354166731238365
+2026-05-11 09:13:38,186 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:14:14,664 | INFO |     epoch          : 17
+2026-05-11 09:14:14,665 | INFO |     loss           : 0.22965468658134341
+2026-05-11 09:14:14,665 | INFO |     grad_norm      : 0.9883233380317687
+2026-05-11 09:14:14,665 | INFO |     accuracy       : 0.935
+2026-05-11 09:14:14,665 | INFO |     val_loss       : 1.2822311073541641
+2026-05-11 09:14:14,665 | INFO |     val_accuracy   : 0.6967447996139526
+2026-05-11 09:14:14,665 | INFO |     test_loss      : 1.2617143727838993
+2026-05-11 09:14:14,665 | INFO |     test_accuracy  : 0.6882812529802322
+2026-05-11 09:14:53,148 | INFO |     epoch          : 18
+2026-05-11 09:14:53,149 | INFO |     loss           : 0.20464578103274106
+2026-05-11 09:14:53,149 | INFO |     grad_norm      : 0.9967984974384307
+2026-05-11 09:14:53,149 | INFO |     accuracy       : 0.94125
+2026-05-11 09:14:53,149 | INFO |     val_loss       : 1.1295203641057014
+2026-05-11 09:14:53,149 | INFO |     val_accuracy   : 0.7268229201436043
+2026-05-11 09:14:53,149 | INFO |     test_loss      : 1.2526568546891212
+2026-05-11 09:14:53,149 | INFO |     test_accuracy  : 0.7082031294703484
+2026-05-11 09:14:53,505 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:15:30,498 | INFO |     epoch          : 19
+2026-05-11 09:15:30,499 | INFO |     loss           : 0.14056063456460832
+2026-05-11 09:15:30,499 | INFO |     grad_norm      : 0.9779578143358231
+2026-05-11 09:15:30,499 | INFO |     accuracy       : 0.95625
+2026-05-11 09:15:30,499 | INFO |     val_loss       : 1.3982296735048294
+2026-05-11 09:15:30,499 | INFO |     val_accuracy   : 0.6985677108168602
+2026-05-11 09:15:30,499 | INFO |     test_loss      : 1.4660246521234512
+2026-05-11 09:15:30,499 | INFO |     test_accuracy  : 0.6764322966337204
+2026-05-11 09:16:08,076 | INFO |     epoch          : 20
+2026-05-11 09:16:08,077 | INFO |     loss           : 0.15000730076804758
+2026-05-11 09:16:08,077 | INFO |     grad_norm      : 0.98759157538414
+2026-05-11 09:16:08,077 | INFO |     accuracy       : 0.95375
+2026-05-11 09:16:08,077 | INFO |     val_loss       : 1.3463560678064823
+2026-05-11 09:16:08,077 | INFO |     val_accuracy   : 0.7256510481238365
+2026-05-11 09:16:08,077 | INFO |     test_loss      : 1.3638218939304352
+2026-05-11 09:16:08,077 | INFO |     test_accuracy  : 0.7195312529802322
+2026-05-11 09:16:08,338 | INFO | Saving last checkpoint: model_last.pth ...
