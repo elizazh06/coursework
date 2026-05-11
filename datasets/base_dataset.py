@@ -80,7 +80,7 @@ class BaseDataset(Dataset):
         Returns:
             data_object (Tensor):
         """
-        data_object = torch.load(path)
+        data_object = torch.load(path, weights_only=False)
         return data_object
 
     def preprocess_data(self, instance_data):

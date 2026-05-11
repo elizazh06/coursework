@@ -303,7 +303,7 @@ class ADVANCEDataset(BaseDataset):
     def __getitem__(self, ind):
         e = self._index[ind]
         if e.get("cached", False):
-            item = torch.load(e["path"], map_location="cpu")
+            item = torch.load(e["path"], map_location="cpu", weights_only=False)
             video = item["video"]
             audio = item["audio"]
             label = item["label"].long()
