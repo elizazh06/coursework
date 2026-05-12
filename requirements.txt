@@ -1,8 +1,11 @@
 decord
 hydra-core
 numpy
+Pillow
 pyyaml
 safetensors
 torch
 torchaudio
+torchvision
+transformers
 tqdm

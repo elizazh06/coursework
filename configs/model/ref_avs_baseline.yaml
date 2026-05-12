@@ -1,0 +1,25 @@
+model:
+  _target_: models.ref_avs_baseline.RefAVSBaselineModel
+
+  # HuggingFace model id for Mask2Former backbone.
+  # The first run will download ~350 MB to ~/.cache/huggingface/
+  # On Kaggle, add the model as a dataset or pre-cache it (see README).
+  pretrained_m2f: facebook/mask2former-swin-base-ade-semantic
+
+  # Internal feature dimension (must match backbone encoder output channels).
+  # Swin-Base last stage → 1024 channels.
+  dim_v: 1024
+
+  num_heads: 8
+
+  # Dimensions of pre-extracted features.
+  audio_dim: 128   # BEATs / wav2vec2 features
+  text_dim: 768    # BERT-base hidden size
+
+  # Output mask resolution (should match dataset.params.mask_size).
+  mask_size: 256
+  image_size: 256   # must match dataset.params.image_size
+
+  # Freeze backbone during first epochs if GPU memory is tight.
+  # Recommended: start with true, then unfreeze via lr_scheduler.
+  freeze_backbone: false

@@ -1,0 +1,44 @@
+dataset:
+  module: ref_avs
+  name: RefAVSDataset
+  batch_size: 2          # keep small — Mask2Former is memory-heavy
+  eval_batch_size: 2
+  num_workers: 2
+  timeout: 120
+  pin_memory: false
+  params:
+    # ── Kaggle dataset root ──────────────────────────────────────────────
+    # In a Kaggle notebook this will be:
+    #   /kaggle/input/ref-avs-bench-dataset
+    # Override with a dotlist arg:
+    #   python train.py --config configs/train_ref_avs.yaml \
+    #       dataset.params.data_root=/kaggle/input/ref-avs-bench-dataset
+    data_root: /kaggle/input/ref-avs-bench-dataset
+
+    # ── sub-directory structure inside data_root ─────────────────────────
+    video_dir: v2_data          # <data_root>/v2_data/<uid>/
+    frames_subdir: frames       # <uid>/frames/  (images)
+    masks_subdir: gt_masks      # <uid>/gt_masks/ (binary PNG masks)
+    audio_feat_dir: audio_features   # <data_root>/audio_features/<uid>.npy
+    text_feat_dir: text_features     # <data_root>/text_features/<uid>.npy
+    metadata_dir: metadata      # <data_root>/metadata/train.csv etc.
+
+    # ── clip settings ────────────────────────────────────────────────────
+    num_frames: 5               # frames sampled per clip
+    mask_size: 256              # output GT mask resolution (H=W)
+    image_size: 256             # frame resize before backbone
+
+    # ── feature extraction ───────────────────────────────────────────────
+    # Set to true if pre-extracted .npy features are available (recommended).
+    # Set to false to extract audio on-the-fly (requires torchaudio)
+    # and text on-the-fly (requires transformers[bert]).
+    use_preextracted_audio: true
+    use_preextracted_text: true
+
+    # ── fallback settings (only used when use_preextracted_* = false) ────
+    audio_sample_rate: 16000
+    audio_n_mels: 128
+    bert_model: bert-base-uncased
+
+    # ── misc ─────────────────────────────────────────────────────────────
+    split_seed: 42

@@ -1,0 +1,268 @@
+2026-05-11 09:46:39,143 | INFO | ADVANCEBaselineModel(
+  (visual_backbone): ResNet(
+    (conv1): Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+    (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (relu): ReLU(inplace=True)
+    (maxpool): MaxPool2d(kernel_size=3, stride=2, padding=1, dilation=1, ceil_mode=False)
+    (layer1): Sequential(
+      (0): BasicBlock(
+        (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (1): BasicBlock(
+        (conv1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (layer2): Sequential(
+      (0): BasicBlock(
+        (conv1): Conv2d(64, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (downsample): Sequential(
+          (0): Conv2d(64, 128, kernel_size=(1, 1), stride=(2, 2), bias=False)
+          (1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+      )
+      (1): BasicBlock(
+        (conv1): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (layer3): Sequential(
+      (0): BasicBlock(
+        (conv1): Conv2d(128, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (downsample): Sequential(
+          (0): Conv2d(128, 256, kernel_size=(1, 1), stride=(2, 2), bias=False)
+          (1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+      )
+      (1): BasicBlock(
+        (conv1): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (layer4): Sequential(
+      (0): BasicBlock(
+        (conv1): Conv2d(256, 512, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (downsample): Sequential(
+          (0): Conv2d(256, 512, kernel_size=(1, 1), stride=(2, 2), bias=False)
+          (1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+      )
+      (1): BasicBlock(
+        (conv1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn1): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (relu): ReLU(inplace=True)
+        (conv2): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        (bn2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+    )
+    (avgpool): AdaptiveAvgPool2d(output_size=(1, 1))
+    (fc): Identity()
+  )
+  (visual_proj): Linear(in_features=512, out_features=256, bias=True)
+  (audio_encoder): Sequential(
+    (0): Conv1d(128, 256, kernel_size=(5,), stride=(1,), padding=(2,))
+    (1): ReLU()
+    (2): Conv1d(256, 256, kernel_size=(3,), stride=(1,), padding=(1,))
+    (3): ReLU()
+  )
+  (fusion): Sequential(
+    (0): Linear(in_features=512, out_features=256, bias=True)
+    (1): ReLU()
+    (2): Dropout(p=0.2, inplace=False)
+    (3): Linear(in_features=256, out_features=13, bias=True)
+  )
+)
+2026-05-11 09:47:14,940 | INFO |     epoch          : 1
+2026-05-11 09:47:14,940 | INFO |     loss           : 0.9177358418703079
+2026-05-11 09:47:14,940 | INFO |     grad_norm      : 0.9999998569488525
+2026-05-11 09:47:14,941 | INFO |     accuracy       : 0.7225
+2026-05-11 09:47:14,941 | INFO |     val_loss       : 0.6402217894792557
+2026-05-11 09:47:14,941 | INFO |     val_accuracy   : 0.7875000089406967
+2026-05-11 09:47:14,941 | INFO |     test_loss      : 0.6298127099871635
+2026-05-11 09:47:14,941 | INFO |     test_accuracy  : 0.8076822981238365
+2026-05-11 09:47:15,224 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:47:49,416 | INFO |     epoch          : 2
+2026-05-11 09:47:49,419 | INFO |     loss           : 0.5929129219055176
+2026-05-11 09:47:49,419 | INFO |     grad_norm      : 0.9999998199939728
+2026-05-11 09:47:49,419 | INFO |     accuracy       : 0.81375
+2026-05-11 09:47:49,419 | INFO |     val_loss       : 0.5117433629930019
+2026-05-11 09:47:49,419 | INFO |     val_accuracy   : 0.8268229216337204
+2026-05-11 09:47:49,419 | INFO |     test_loss      : 0.43465527426451445
+2026-05-11 09:47:49,420 | INFO |     test_accuracy  : 0.8725260496139526
+2026-05-11 09:47:49,850 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:48:23,723 | INFO |     epoch          : 3
+2026-05-11 09:48:23,724 | INFO |     loss           : 0.44517270192503927
+2026-05-11 09:48:23,724 | INFO |     grad_norm      : 0.9999997961521149
+2026-05-11 09:48:23,724 | INFO |     accuracy       : 0.85625
+2026-05-11 09:48:23,724 | INFO |     val_loss       : 0.37301186518743634
+2026-05-11 09:48:23,724 | INFO |     val_accuracy   : 0.8880208358168602
+2026-05-11 09:48:23,724 | INFO |     test_loss      : 0.4013950238004327
+2026-05-11 09:48:23,724 | INFO |     test_accuracy  : 0.8796875029802322
+2026-05-11 09:48:24,062 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:48:57,328 | INFO |     epoch          : 4
+2026-05-11 09:48:57,328 | INFO |     loss           : 0.4261421474069357
+2026-05-11 09:48:57,328 | INFO |     grad_norm      : 0.9999997591972352
+2026-05-11 09:48:57,328 | INFO |     accuracy       : 0.87625
+2026-05-11 09:48:57,328 | INFO |     val_loss       : 0.32296000607311726
+2026-05-11 09:48:57,329 | INFO |     val_accuracy   : 0.9132812544703484
+2026-05-11 09:48:57,329 | INFO |     test_loss      : 0.23322758451104164
+2026-05-11 09:48:57,329 | INFO |     test_accuracy  : 0.9294270873069763
+2026-05-11 09:48:57,649 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:49:31,489 | INFO |     epoch          : 5
+2026-05-11 09:49:31,490 | INFO |     loss           : 0.394737800899893
+2026-05-11 09:49:31,490 | INFO |     grad_norm      : 0.9796189188957214
+2026-05-11 09:49:31,490 | INFO |     accuracy       : 0.88
+2026-05-11 09:49:31,490 | INFO |     val_loss       : 0.3500990252941847
+2026-05-11 09:49:31,490 | INFO |     val_accuracy   : 0.8890625089406967
+2026-05-11 09:49:31,490 | INFO |     test_loss      : 0.38234492810443044
+2026-05-11 09:49:31,490 | INFO |     test_accuracy  : 0.8933593779802322
+2026-05-11 09:50:04,038 | INFO |     epoch          : 6
+2026-05-11 09:50:04,038 | INFO |     loss           : 0.28628906212747096
+2026-05-11 09:50:04,038 | INFO |     grad_norm      : 0.9627316474914551
+2026-05-11 09:50:04,039 | INFO |     accuracy       : 0.91375
+2026-05-11 09:50:04,039 | INFO |     val_loss       : 0.2513911062851548
+2026-05-11 09:50:04,039 | INFO |     val_accuracy   : 0.9157552123069763
+2026-05-11 09:50:04,039 | INFO |     test_loss      : 0.30467000138014555
+2026-05-11 09:50:04,039 | INFO |     test_accuracy  : 0.9296875
+2026-05-11 09:50:04,334 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:50:38,687 | INFO |     epoch          : 7
+2026-05-11 09:50:38,693 | INFO |     loss           : 0.2552186786103994
+2026-05-11 09:50:38,693 | INFO |     grad_norm      : 0.9471945223212243
+2026-05-11 09:50:38,693 | INFO |     accuracy       : 0.93
+2026-05-11 09:50:38,694 | INFO |     val_loss       : 0.35599483782425523
+2026-05-11 09:50:38,694 | INFO |     val_accuracy   : 0.9072916731238365
+2026-05-11 09:50:38,694 | INFO |     test_loss      : 0.3047458538785577
+2026-05-11 09:50:38,694 | INFO |     test_accuracy  : 0.9096354246139526
+2026-05-11 09:51:12,485 | INFO |     epoch          : 8
+2026-05-11 09:51:12,485 | INFO |     loss           : 0.26237884575268255
+2026-05-11 09:51:12,485 | INFO |     grad_norm      : 0.8572754693776369
+2026-05-11 09:51:12,485 | INFO |     accuracy       : 0.93125
+2026-05-11 09:51:12,485 | INFO |     val_loss       : 0.417763558216393
+2026-05-11 09:51:12,485 | INFO |     val_accuracy   : 0.8877604231238365
+2026-05-11 09:51:12,485 | INFO |     test_loss      : 0.29689378663897514
+2026-05-11 09:51:12,485 | INFO |     test_accuracy  : 0.9253906309604645
+2026-05-11 09:51:45,441 | INFO |     epoch          : 9
+2026-05-11 09:51:45,441 | INFO |     loss           : 0.20603790522320195
+2026-05-11 09:51:45,441 | INFO |     grad_norm      : 0.8276498945802451
+2026-05-11 09:51:45,441 | INFO |     accuracy       : 0.9375
+2026-05-11 09:51:45,441 | INFO |     val_loss       : 0.3223514724522829
+2026-05-11 09:51:45,442 | INFO |     val_accuracy   : 0.9191406294703484
+2026-05-11 09:51:45,442 | INFO |     test_loss      : 0.20329488860443234
+2026-05-11 09:51:45,442 | INFO |     test_accuracy  : 0.9470052123069763
+2026-05-11 09:51:45,745 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:52:19,118 | INFO |     epoch          : 10
+2026-05-11 09:52:19,118 | INFO |     loss           : 0.17914024809055262
+2026-05-11 09:52:19,118 | INFO |     grad_norm      : 0.8526900303177536
+2026-05-11 09:52:19,118 | INFO |     accuracy       : 0.95
+2026-05-11 09:52:19,118 | INFO |     val_loss       : 0.3589101281540934
+2026-05-11 09:52:19,119 | INFO |     val_accuracy   : 0.9188802167773247
+2026-05-11 09:52:19,119 | INFO |     test_loss      : 0.42368793761124834
+2026-05-11 09:52:19,119 | INFO |     test_accuracy  : 0.9191406294703484
+2026-05-11 09:52:52,291 | INFO |     epoch          : 11
+2026-05-11 09:52:52,292 | INFO |     loss           : 0.05152188201827812
+2026-05-11 09:52:52,292 | INFO |     grad_norm      : 0.5313965123984963
+2026-05-11 09:52:52,292 | INFO |     accuracy       : 0.98125
+2026-05-11 09:52:52,292 | INFO |     val_loss       : 0.17829300416633487
+2026-05-11 09:52:52,292 | INFO |     val_accuracy   : 0.9606770873069763
+2026-05-11 09:52:52,292 | INFO |     test_loss      : 0.18693540547974408
+2026-05-11 09:52:52,292 | INFO |     test_accuracy  : 0.9569010511040688
+2026-05-11 09:52:52,569 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:53:27,261 | INFO |     epoch          : 12
+2026-05-11 09:53:27,262 | INFO |     loss           : 0.018873302497413532
+2026-05-11 09:53:27,262 | INFO |     grad_norm      : 0.30078280115209055
+2026-05-11 09:53:27,262 | INFO |     accuracy       : 0.995
+2026-05-11 09:53:27,262 | INFO |     val_loss       : 0.19906910799909383
+2026-05-11 09:53:27,262 | INFO |     val_accuracy   : 0.9584635496139526
+2026-05-11 09:53:27,262 | INFO |     test_loss      : 0.2003520471334923
+2026-05-11 09:53:27,262 | INFO |     test_accuracy  : 0.970703125
+2026-05-11 09:54:00,484 | INFO |     epoch          : 13
+2026-05-11 09:54:00,484 | INFO |     loss           : 0.015383942701437264
+2026-05-11 09:54:00,484 | INFO |     grad_norm      : 0.24338173338153865
+2026-05-11 09:54:00,484 | INFO |     accuracy       : 0.995
+2026-05-11 09:54:00,484 | INFO |     val_loss       : 0.17620983463712037
+2026-05-11 09:54:00,484 | INFO |     val_accuracy   : 0.9645833373069763
+2026-05-11 09:54:00,484 | INFO |     test_loss      : 0.10681678637047298
+2026-05-11 09:54:00,485 | INFO |     test_accuracy  : 0.978515625
+2026-05-11 09:54:00,759 | INFO | Saving current best: model_best.pth ...
+2026-05-11 09:54:33,907 | INFO |     epoch          : 14
+2026-05-11 09:54:33,907 | INFO |     loss           : 0.01547153547292055
+2026-05-11 09:54:33,907 | INFO |     grad_norm      : 0.2612347776387469
+2026-05-11 09:54:33,907 | INFO |     accuracy       : 0.99625
+2026-05-11 09:54:33,907 | INFO |     val_loss       : 0.23683695630461443
+2026-05-11 09:54:33,907 | INFO |     val_accuracy   : 0.9644531309604645
+2026-05-11 09:54:33,907 | INFO |     test_loss      : 0.12207593922357773
+2026-05-11 09:54:33,907 | INFO |     test_accuracy  : 0.974609375
+2026-05-11 09:55:06,644 | INFO |     epoch          : 15
+2026-05-11 09:55:06,644 | INFO |     loss           : 0.022500188883332158
+2026-05-11 09:55:06,644 | INFO |     grad_norm      : 0.3451952939957846
+2026-05-11 09:55:06,644 | INFO |     accuracy       : 0.99
+2026-05-11 09:55:06,644 | INFO |     val_loss       : 0.3089007123489864
+2026-05-11 09:55:06,644 | INFO |     val_accuracy   : 0.9548177123069763
+2026-05-11 09:55:06,645 | INFO |     test_loss      : 0.23939818235294297
+2026-05-11 09:55:06,645 | INFO |     test_accuracy  : 0.958984375
+2026-05-11 09:55:39,068 | INFO |     epoch          : 16
+2026-05-11 09:55:39,068 | INFO |     loss           : 0.01659903953306639
+2026-05-11 09:55:39,068 | INFO |     grad_norm      : 0.205851643870119
+2026-05-11 09:55:39,069 | INFO |     accuracy       : 0.99375
+2026-05-11 09:55:39,069 | INFO |     val_loss       : 0.2660531292203814
+2026-05-11 09:55:39,069 | INFO |     val_accuracy   : 0.9625000059604645
+2026-05-11 09:55:39,069 | INFO |     test_loss      : 0.16254288688651286
+2026-05-11 09:55:39,069 | INFO |     test_accuracy  : 0.96875
+2026-05-11 09:56:10,728 | INFO |     epoch          : 17
+2026-05-11 09:56:10,728 | INFO |     loss           : 0.006256769188439648
+2026-05-11 09:56:10,728 | INFO |     grad_norm      : 0.184914764600544
+2026-05-11 09:56:10,728 | INFO |     accuracy       : 0.99875
+2026-05-11 09:56:10,728 | INFO |     val_loss       : 0.23909814727448975
+2026-05-11 09:56:10,728 | INFO |     val_accuracy   : 0.9643229246139526
+2026-05-11 09:56:10,728 | INFO |     test_loss      : 0.19876389755518176
+2026-05-11 09:56:10,729 | INFO |     test_accuracy  : 0.9666666761040688
+2026-05-11 09:56:42,540 | INFO |     epoch          : 18
+2026-05-11 09:56:42,540 | INFO |     loss           : 0.03712479963122405
+2026-05-11 09:56:42,540 | INFO |     grad_norm      : 0.3376271406951855
+2026-05-11 09:56:42,540 | INFO |     accuracy       : 0.99
+2026-05-11 09:56:42,540 | INFO |     val_loss       : 0.3192137103906134
+2026-05-11 09:56:42,540 | INFO |     val_accuracy   : 0.9626302123069763
+2026-05-11 09:56:42,540 | INFO |     test_loss      : 0.2632692634651903
+2026-05-11 09:56:42,540 | INFO |     test_accuracy  : 0.96875
+2026-05-11 09:57:14,749 | INFO |     epoch          : 19
+2026-05-11 09:57:14,750 | INFO |     loss           : 0.0251260931611273
+2026-05-11 09:57:14,750 | INFO |     grad_norm      : 0.3736720073319157
+2026-05-11 09:57:14,750 | INFO |     accuracy       : 0.9925
+2026-05-11 09:57:14,750 | INFO |     val_loss       : 0.21004272867139662
+2026-05-11 09:57:14,750 | INFO |     val_accuracy   : 0.9644531309604645
+2026-05-11 09:57:14,752 | INFO |     test_loss      : 0.20817255939891766
+2026-05-11 09:57:14,752 | INFO |     test_accuracy  : 0.96875
+2026-05-11 09:57:46,803 | INFO |     epoch          : 20
+2026-05-11 09:57:46,804 | INFO |     loss           : 0.06778984290631569
+2026-05-11 09:57:46,804 | INFO |     grad_norm      : 0.3404249070771039
+2026-05-11 09:57:46,804 | INFO |     accuracy       : 0.9825
+2026-05-11 09:57:46,804 | INFO |     val_loss       : 0.3114909175783396
+2026-05-11 09:57:46,804 | INFO |     val_accuracy   : 0.9447916746139526
+2026-05-11 09:57:46,804 | INFO |     test_loss      : 0.16019667708314955
+2026-05-11 09:57:46,804 | INFO |     test_accuracy  : 0.98046875
+2026-05-11 09:57:47,202 | INFO | Saving last checkpoint: model_last.pth ...
