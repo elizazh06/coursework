@@ -16,8 +16,8 @@
 dataset:
   module: ref_avs
   name: RefAVSDataset
-  batch_size: 2          # Mask2Former-Swin-Base is memory-heavy
-  eval_batch_size: 2
+  batch_size: 1          # 1 sample = 10 frames through Swin-Base; keep at 1
+  eval_batch_size: 1
   num_workers: 0         # 0 recommended: text encoder lives in __init__
   timeout: 0             # must be 0 when num_workers=0
   pin_memory: false

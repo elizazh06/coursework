@@ -214,26 +214,54 @@ class RefAVSBaselineModel(nn.Module):
     # ------------------------------------------------------------------
 
     def _encode_visual(self, frames: torch.Tensor) -> torch.Tensor:
-        """
+        """Encode all B*T frames through the Mask2Former backbone.
+
+        When the backbone is frozen the forward pass is wrapped in
+        torch.no_grad() and frames are processed one at a time so that
+        only the thin vis_proj layer ever accumulates gradients.
+
         Args:
             frames: [B*T, C, H, W]
         Returns:
-            feat_vis: [B, T * S, dim_v]   (S = spatial_size^2)
+            enc: [B*T, S, dim_v]   (S = spatial_size^2)
         """
         bt = frames.size(0)
-        outputs = self.backbone(pixel_values=frames)
+        frozen = not any(p.requires_grad for p in self.backbone.parameters())
 
-        # encoder_last_hidden_state shape from Mask2Former (Swin backbone):
-        # [B*T, channels, h, w] where h = w = spatial_size
-        enc = outputs.encoder_last_hidden_state   # [B*T, C, h, w]
+        if frozen:
+            # Process frame-by-frame: avoids storing O(B*T) backbone activations.
+            enc_list = []
+            with torch.no_grad():
+                for i in range(bt):
+                    out_i = self.backbone(pixel_values=frames[i: i + 1])
+                    enc_i = out_i.encoder_last_hidden_state   # [1, H, W, C] or [1, C, H, W]
+                    enc_i = self._to_tokens(enc_i)            # [1, S, C]
+                    enc_list.append(enc_i)
+            enc = torch.cat(enc_list, dim=0)   # [B*T, S, C]
+        else:
+            outputs = self.backbone(pixel_values=frames)
+            enc = self._to_tokens(outputs.encoder_last_hidden_state)
 
-        # Swin outputs are sometimes in NHWC; handle both
-        if enc.dim() == 4:
-            # [B*T, C, h, w] → [B*T, h*w, C]
-            enc = enc.flatten(2).transpose(1, 2)
-        # enc: [B*T, S, C]  where S = h*w
         enc = self.vis_proj(enc)   # [B*T, S, dim_v]
         return enc
+
+    @staticmethod
+    def _to_tokens(enc: torch.Tensor) -> torch.Tensor:
+        """Flatten spatial dims to a token sequence → [B, S, C].
+
+        Swin returns NHWC  [B, H, W, C].
+        Standard CNN/ViT may return NCHW [B, C, H, W].
+        """
+        if enc.dim() == 4:
+            # Detect format: for Swin-Base C=1024 >> typical spatial H,W (e.g. 8)
+            # so last dim being the largest signals NHWC.
+            if enc.size(-1) > enc.size(1):
+                # NHWC [B, H, W, C] → [B, H*W, C]
+                return enc.reshape(enc.size(0), -1, enc.size(-1))
+            else:
+                # NCHW [B, C, H, W] → [B, H*W, C]
+                return enc.flatten(2).transpose(1, 2)
+        return enc   # already [B, S, C]
 
     # ------------------------------------------------------------------
     # forward

@@ -21,6 +21,6 @@ model:
   mask_size: 256
   image_size: 256   # must match dataset.params.image_size
 
-  # Freeze backbone during first epochs if GPU memory is tight.
-  # Recommended: start with true, then unfreeze via lr_scheduler.
-  freeze_backbone: false
+  # Following the original paper: only fusion/projection layers are trained;
+  # backbone is frozen. This also avoids OOM on Kaggle T4/P100 GPUs.
+  freeze_backbone: true
