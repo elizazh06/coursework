@@ -148,8 +148,9 @@ class RefAVSBaselineModel(nn.Module):
         else:
             _m2f = Mask2FormerModel(Mask2FormerConfig())
 
-        # pixel_level_module.encoder → SwinBackbone → .model → SwinModel
-        self._swin: nn.Module = _m2f.pixel_level_module.encoder.model
+        # pixel_level_module.encoder is already the SwinBackbone itself.
+        # SwinBackbone has no inner .model wrapper — it IS the backbone.
+        self._swin: nn.Module = _m2f.pixel_level_module.encoder
         del _m2f   # release pixel decoder + transformer module (~200 MB)
 
         if freeze_backbone:
@@ -232,8 +233,10 @@ class RefAVSBaselineModel(nn.Module):
         Returns:
             enc: [B*T, S, dim_v]   (S = spatial_size^2)
         """
-        # Call only the SwinModel — no deformable attention, no decoder queries.
-        # SwinModel.last_hidden_state: [B*T, S, 1024] (already flat).
+        # Call only the SwinBackbone — no deformable attention, no decoder queries.
+        # SwinBackbone returns BackboneOutput with feature_maps tuple.
+        # feature_maps[-1] is the deepest stage: [B*T, C, H, W] NCHW  (or NHWC
+        # depending on transformers version; _to_tokens handles both).
         frozen = not next(self._swin.parameters()).requires_grad
         if frozen:
             with torch.no_grad():
@@ -241,18 +244,20 @@ class RefAVSBaselineModel(nn.Module):
         else:
             out = self._swin(pixel_values=frames)
 
-        enc = self._to_tokens(out.last_hidden_state)  # [B*T, S, 1024]
-        enc = self.vis_proj(enc)                       # [B*T, S, dim_v]
+        enc = self._to_tokens(out.feature_maps[-1])  # [B*T, S, 1024]
+        enc = self.vis_proj(enc)                      # [B*T, S, dim_v]
         return enc
 
     @staticmethod
     def _to_tokens(enc: torch.Tensor) -> torch.Tensor:
         if enc.dim() == 3:
-            return enc          # [B, S, C] from SwinModel — already flat
+            return enc  # already [B, S, C]
         if enc.dim() == 4:
-            if enc.size(-1) > enc.size(1):  # NHWC
+            # NCHW: size(1) is channels (e.g. 1024) >> size(-1) (e.g. 8)
+            # NHWC: size(-1) is channels (e.g. 1024) >> size(1) (e.g. 8)
+            if enc.size(-1) > enc.size(1):  # NHWC [B, H, W, C]
                 return enc.reshape(enc.size(0), -1, enc.size(-1))
-            else:                            # NCHW
+            else:                            # NCHW [B, C, H, W]
                 return enc.flatten(2).transpose(1, 2)
         return enc
 
