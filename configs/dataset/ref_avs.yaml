@@ -1,44 +1,95 @@
+# ──────────────────────────────────────────────────────────────────────────
+# Ref-AVS-Bench dataset profile.
+#
+# Usage (merges over train.yaml / inference.yaml via deep-merge):
+#   python train.py     dataset=ref_avs model=ref_avs_baseline
+#   python inference.py dataset=ref_avs model=ref_avs_baseline \
+#                       inferencer.from_pretrained=checkpoints/ref_avs_baseline/model_best.pth
+# ──────────────────────────────────────────────────────────────────────────
+
 dataset:
   module: ref_avs
   name: RefAVSDataset
-  batch_size: 2          # keep small — Mask2Former is memory-heavy
+  batch_size: 2          # Mask2Former-Swin-Base is memory-heavy; keep small
   eval_batch_size: 2
   num_workers: 2
   timeout: 120
   pin_memory: false
   params:
-    # ── Kaggle dataset root ──────────────────────────────────────────────
-    # In a Kaggle notebook this will be:
-    #   /kaggle/input/ref-avs-bench-dataset
-    # Override with a dotlist arg:
-    #   python train.py --config configs/train_ref_avs.yaml \
-    #       dataset.params.data_root=/kaggle/input/ref-avs-bench-dataset
+    # On Kaggle: /kaggle/input/ref-avs-bench-dataset
+    # Override via CLI: dataset.params.data_root=/kaggle/input/ref-avs-bench-dataset
     data_root: /kaggle/input/ref-avs-bench-dataset
 
-    # ── sub-directory structure inside data_root ─────────────────────────
+    # Sub-directory structure inside data_root
     video_dir: v2_data          # <data_root>/v2_data/<uid>/
-    frames_subdir: frames       # <uid>/frames/  (images)
+    frames_subdir: frames       # <uid>/frames/  (jpg images)
     masks_subdir: gt_masks      # <uid>/gt_masks/ (binary PNG masks)
     audio_feat_dir: audio_features   # <data_root>/audio_features/<uid>.npy
     text_feat_dir: text_features     # <data_root>/text_features/<uid>.npy
-    metadata_dir: metadata      # <data_root>/metadata/train.csv etc.
+    metadata_dir: metadata      # <data_root>/metadata/{train,val,test}.csv
 
-    # ── clip settings ────────────────────────────────────────────────────
+    # Clip settings
     num_frames: 5               # frames sampled per clip
-    mask_size: 256              # output GT mask resolution (H=W)
-    image_size: 256             # frame resize before backbone
+    mask_size: 256              # GT mask resolution H = W
+    image_size: 256             # frame resize fed to backbone
 
-    # ── feature extraction ───────────────────────────────────────────────
-    # Set to true if pre-extracted .npy features are available (recommended).
-    # Set to false to extract audio on-the-fly (requires torchaudio)
-    # and text on-the-fly (requires transformers[bert]).
+    # Set true when pre-extracted .npy features are available (recommended).
+    # Set false to encode on-the-fly (requires torchaudio + transformers).
     use_preextracted_audio: true
     use_preextracted_text: true
-
-    # ── fallback settings (only used when use_preextracted_* = false) ────
     audio_sample_rate: 16000
     audio_n_mels: 128
     bert_model: bert-base-uncased
 
-    # ── misc ─────────────────────────────────────────────────────────────
-    split_seed: 42
+# ── Trainer overrides (task is segmentation, not classification) ───────────
+trainer:
+  n_epochs: 30
+  monitor: "max val_mean_iou"
+  early_stop: 8
+  log_step: 20
+  # tensor keys that must be moved to GPU (replaces advance defaults)
+  device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
+
+# ── Inferencer overrides ───────────────────────────────────────────────────
+inferencer:
+  device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
+  save_path: ref_avs_inference
+  from_pretrained: checkpoints/ref_avs_baseline/model_best.pth
+  metrics_filename: test_metrics.json
+
+# ── Loss function (BCE + Dice instead of cross-entropy) ───────────────────
+loss_function:
+  _target_: losses.segmentation.SegmentationLoss
+  bce_weight: 1.0
+  dice_weight: 1.0
+  # Uncomment when foreground pixels are sparse:
+  # pos_weight: 5.0
+
+# ── Metrics ───────────────────────────────────────────────────────────────
+metrics:
+  train:
+    - _target_: metrics.segmentation_metrics.MeanIoUMetric
+      name: mean_iou
+  inference:
+    - _target_: metrics.segmentation_metrics.MeanIoUMetric
+      name: mean_iou
+    - _target_: metrics.segmentation_metrics.BoundaryFMetric
+      name: boundary_f
+    - _target_: metrics.segmentation_metrics.JAndFMetric
+      name: j_and_f
+
+# ── Optimizer / scheduler ─────────────────────────────────────────────────
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
+  T_max: 30
+  eta_min: 1.0e-6
+
+# ── Writer ────────────────────────────────────────────────────────────────
+writer:
+  run_name: ref_avs_train
+  loss_names: ["loss", "bce_loss", "dice_loss"]
