@@ -133,7 +133,9 @@ class RefAVSDataset(BaseDataset):
 
         # ── text encoder (DistilRoBERTa) ───────────────────────────────────
         try:
-            from transformers import AutoTokenizer, AutoModel
+            import logging as _logging
+            from transformers import AutoTokenizer, AutoModel, logging as hf_logging
+            hf_logging.set_verbosity_error()   # suppress UNEXPECTED key warnings
             self._tokenizer = AutoTokenizer.from_pretrained(text_model)
             self._text_encoder = AutoModel.from_pretrained(text_model).eval()
         except ImportError:

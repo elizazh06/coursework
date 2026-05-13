@@ -127,6 +127,7 @@ class RefAVSBaselineModel(nn.Module):
         mask_size: int = 256,
         image_size: int = 256,
         freeze_backbone: bool = False,
+        **_,   # absorb leftover keys from config deep-merge (e.g. advance params)
     ):
         super().__init__()
 
