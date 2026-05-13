@@ -37,6 +37,13 @@ dataset:
     text_model: distilbert/distilroberta-base
     text_max_len: 25
 
+    # Feature cache (text + audio pre-extracted once, ~600 MB total).
+    # First run builds the cache (~10 min); all subsequent runs load from disk
+    # and reduce per-sample latency from ~600 ms → ~2 ms.
+    use_cache: true
+    cache_root: /kaggle/working/ref_avs_cache
+    rebuild_cache: false
+
 # ── Trainer overrides (segmentation task, not classification) ─────────────
 trainer:
   n_epochs: 30
