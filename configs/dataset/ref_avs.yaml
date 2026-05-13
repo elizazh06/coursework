@@ -1,53 +1,48 @@
 # ──────────────────────────────────────────────────────────────────────────
 # Ref-AVS-Bench dataset profile.
 #
-# Usage (merges over train.yaml / inference.yaml via deep-merge):
+# Actual dataset layout (elizazh/ref-avs-bench-unpacked on Kaggle):
+#   <data_root>/metadata.csv              — vid, uid, fid, exp, split
+#   <data_root>/media/<vid>/audio.wav
+#   <data_root>/media/<vid>/frames/{0..9}.jpg
+#   <data_root>/gt_mask/<vid>/fid_<fid>/0000{0..9}.png
+#
+# Usage:
 #   python train.py     dataset=ref_avs model=ref_avs_baseline
 #   python inference.py dataset=ref_avs model=ref_avs_baseline \
-#                       inferencer.from_pretrained=checkpoints/ref_avs_baseline/model_best.pth
+#       inferencer.from_pretrained=checkpoints/ref_avs_baseline/model_best.pth
 # ──────────────────────────────────────────────────────────────────────────
 
 dataset:
   module: ref_avs
   name: RefAVSDataset
-  batch_size: 2          # Mask2Former-Swin-Base is memory-heavy; keep small
+  batch_size: 2          # Mask2Former-Swin-Base is memory-heavy
   eval_batch_size: 2
-  num_workers: 2
+  num_workers: 0         # 0 recommended: text encoder lives in __init__
   timeout: 120
   pin_memory: false
   params:
-    # On Kaggle: /kaggle/input/ref-avs-bench-dataset
-    # Override via CLI: dataset.params.data_root=/kaggle/input/ref-avs-bench-dataset
-    data_root: /kaggle/input/ref-avs-bench-dataset
+    # Path to the unpacked dataset on Kaggle.
+    # Override at runtime:
+    #   dataset.params.data_root=/kaggle/input/ref-avs-bench-unpacked
+    data_root: /kaggle/input/ref-avs-bench-unpacked
 
-    # Sub-directory structure inside data_root
-    video_dir: v2_data          # <data_root>/v2_data/<uid>/
-    frames_subdir: frames       # <uid>/frames/  (jpg images)
-    masks_subdir: gt_masks      # <uid>/gt_masks/ (binary PNG masks)
-    audio_feat_dir: audio_features   # <data_root>/audio_features/<uid>.npy
-    text_feat_dir: text_features     # <data_root>/text_features/<uid>.npy
-    metadata_dir: metadata      # <data_root>/metadata/{train,val,test}.csv
+    frame_n: 10           # frames per clip (fixed in original code)
+    mask_size: 256        # GT and output mask resolution H = W
+    image_size: 256       # frame resize fed to backbone
 
-    # Clip settings
-    num_frames: 5               # frames sampled per clip
-    mask_size: 256              # GT mask resolution H = W
-    image_size: 256             # frame resize fed to backbone
+    sample_rate: 16000    # audio resampling target
 
-    # Set true when pre-extracted .npy features are available (recommended).
-    # Set false to encode on-the-fly (requires torchaudio + transformers).
-    use_preextracted_audio: true
-    use_preextracted_text: true
-    audio_sample_rate: 16000
-    audio_n_mels: 128
-    bert_model: bert-base-uncased
+    # Text model — same as official code (distilbert/distilroberta-base)
+    text_model: distilbert/distilroberta-base
+    text_max_len: 25
 
-# ── Trainer overrides (task is segmentation, not classification) ───────────
+# ── Trainer overrides (segmentation task, not classification) ─────────────
 trainer:
   n_epochs: 30
   monitor: "max val_mean_iou"
   early_stop: 8
   log_step: 20
-  # tensor keys that must be moved to GPU (replaces advance defaults)
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
 
 # ── Inferencer overrides ───────────────────────────────────────────────────
@@ -57,13 +52,11 @@ inferencer:
   from_pretrained: checkpoints/ref_avs_baseline/model_best.pth
   metrics_filename: test_metrics.json
 
-# ── Loss function (BCE + Dice instead of cross-entropy) ───────────────────
+# ── Loss (BCE + Dice instead of cross-entropy) ────────────────────────────
 loss_function:
   _target_: losses.segmentation.SegmentationLoss
   bce_weight: 1.0
   dice_weight: 1.0
-  # Uncomment when foreground pixels are sparse:
-  # pos_weight: 5.0
 
 # ── Metrics ───────────────────────────────────────────────────────────────
 metrics:

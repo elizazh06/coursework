@@ -12,9 +12,10 @@ model:
 
   num_heads: 8
 
-  # Dimensions of pre-extracted features.
-  audio_dim: 128   # BEATs / wav2vec2 features
-  text_dim: 768    # BERT-base hidden size
+  # Audio: MelSpectrogram 128 mel bins (matches VGGish output dim)
+  audio_dim: 128
+  # Text: DistilRoBERTa hidden size 768 (distilbert/distilroberta-base)
+  text_dim: 768
 
   # Output mask resolution (should match dataset.params.mask_size).
   mask_size: 256

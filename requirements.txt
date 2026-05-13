@@ -1,6 +1,8 @@
 decord
 hydra-core
 numpy
+opencv-python
+pandas
 Pillow
 pyyaml
 safetensors
