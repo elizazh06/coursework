@@ -7,10 +7,20 @@
 #   <data_root>/media/<vid>/frames/{0..9}.jpg
 #   <data_root>/gt_mask/<vid>/fid_<fid>/0000{0..9}.png
 #
-# Usage:
-#   python train.py     dataset=ref_avs model=ref_avs_baseline
+# Usage (baseline):
+#   python train.py     dataset=ref_avs model=ref_avs_baseline \
+#       writer.run_name=ref_avs_baseline
 #   python inference.py dataset=ref_avs model=ref_avs_baseline \
+#       writer.run_name=ref_avs_baseline \
 #       inferencer.from_pretrained=checkpoints/ref_avs_baseline/model_best.pth
+#
+# Usage (Mixture-of-Mamba segmentation):
+#   python train.py     dataset=ref_avs model=mixture_of_mamba_ref_avs \
+#       writer.run_name=mixture_of_mamba_ref_avs \
+#       dataset.params.data_root=/path/to/ref-avs-bench-unpacked
+#   python inference.py dataset=ref_avs model=mixture_of_mamba_ref_avs \
+#       writer.run_name=mixture_of_mamba_ref_avs \
+#       inferencer.from_pretrained=checkpoints/mixture_of_mamba_ref_avs/model_best.pth
 # ──────────────────────────────────────────────────────────────────────────
 
 dataset:
