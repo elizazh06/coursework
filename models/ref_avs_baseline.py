@@ -233,7 +233,6 @@ class RefAVSBaselineModel(nn.Module):
     # cached memory (paper: process_with_cached_memory)
     # ------------------------------------------------------------------
 
-    @staticmethod
     def _cached_memory(feat: torch.Tensor) -> torch.Tensor:
         """
         Temporal differential encoding via a causal cumulative mean.
