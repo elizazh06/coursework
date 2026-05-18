@@ -30,7 +30,9 @@ dataset:
   eval_batch_size: 1
   # With use_cache=true the text encoder is not called in __getitem__, so
   # worker processes only do disk I/O + image decoding — safe to parallelise.
-  num_workers: 2
+  num_workers: 4
+  prefetch_factor: 4
+  persistent_workers: true
   timeout: 0
   pin_memory: true       # faster CPU→GPU tensor transfer
   params:
@@ -62,6 +64,14 @@ trainer:
   monitor: "max val_mean_iou"
   early_stop: 8
   log_step: 20
+  # Validate every 2 epochs and only on val split to reduce epoch wall-clock.
+  eval_every: 2
+  eval_parts: ["val"]
+  # Grad norm is expensive for large segmentation models: log it sparsely.
+  grad_norm_every: 100
+  # AMP gives substantial speedup on Kaggle GPUs (T4/P100/L4).
+  use_amp: true
+  amp_dtype: fp16
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
 
 # ── Inferencer overrides ───────────────────────────────────────────────────

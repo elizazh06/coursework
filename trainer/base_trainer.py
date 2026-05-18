@@ -72,6 +72,9 @@ class BaseTrainer:
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.batch_transforms = batch_transforms
+        self.grad_norm_every = int(self.cfg_trainer.get("grad_norm_every", self.log_step))
+        if self.grad_norm_every <= 0:
+            self.grad_norm_every = self.log_step
 
         # define dataloaders
         self.train_dataloader = dataloaders["train"]
@@ -208,6 +211,7 @@ class BaseTrainer:
         self.train_metrics.reset()
         self.writer.set_step((epoch - 1) * self.epoch_len)
         self.writer.add_scalar("epoch", epoch)
+        last_train_metrics = self.train_metrics.result()
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
         ):
@@ -224,7 +228,8 @@ class BaseTrainer:
                 else:
                     raise e
 
-            self.train_metrics.update("grad_norm", self._get_grad_norm())
+            if batch_idx % self.grad_norm_every == 0:
+                self.train_metrics.update("grad_norm", self._get_grad_norm())
 
             # log current results
             if batch_idx % self.log_step == 0:
@@ -252,9 +257,21 @@ class BaseTrainer:
             self.lr_scheduler.step()
 
         # Run val/test
-        for part, dataloader in self.evaluation_dataloaders.items():
-            val_logs = self._evaluation_epoch(epoch, part, dataloader)
-            logs.update(**{f"{part}_{name}": value for name, value in val_logs.items()})
+        eval_every = int(self.cfg_trainer.get("eval_every", 1))
+        if eval_every <= 0:
+            eval_every = 1
+        if epoch % eval_every == 0:
+            eval_parts = self.cfg_trainer.get("eval_parts", None)
+            for part, dataloader in self.evaluation_dataloaders.items():
+                if eval_parts is not None and part not in eval_parts:
+                    continue
+                val_logs = self._evaluation_epoch(epoch, part, dataloader)
+                logs.update(**{f"{part}_{name}": value for name, value in val_logs.items()})
+        else:
+            self.logger.info(
+                f"Skipping evaluation at epoch {epoch} "
+                f"(eval_every={eval_every})."
+            )
 
         return logs
 
@@ -322,10 +339,9 @@ class BaseTrainer:
             except KeyError:
                 self.logger.warning(
                     f"Warning: Metric '{self.mnt_metric}' is not found. "
-                    "Model performance monitoring is disabled."
+                    "Skipping performance monitoring for this epoch."
                 )
-                self.mnt_mode = "off"
-                improved = False
+                return best, stop_process, not_improved_count
 
             if improved:
                 self.mnt_best = logs[self.mnt_metric]

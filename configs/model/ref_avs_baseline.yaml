@@ -11,6 +11,8 @@ model:
   dim_v: 1024
 
   num_heads: 8
+  prompt_dim: 256
+  cache_mem_beta: 1.0
 
   # Audio: MelSpectrogram 128 mel bins (matches VGGish output dim)
   audio_dim: 128

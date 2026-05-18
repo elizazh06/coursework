@@ -47,10 +47,18 @@ class _CrossAttnDecoder(nn.Module):
     output                [B*T, 1, mask_size, mask_size]
     """
 
-    def __init__(self, dim_v: int, num_heads: int, mask_size: int, spatial_size: int):
+    def __init__(
+        self,
+        dim_v: int,
+        num_heads: int,
+        mask_size: int,
+        spatial_size: int,
+        prompt_dim: int,
+    ):
         super().__init__()
         self.spatial_size = spatial_size
         self.mask_size = mask_size
+        self.prompt_proj = nn.Linear(prompt_dim, dim_v) if prompt_dim != dim_v else nn.Identity()
 
         self.cross_attn = nn.MultiheadAttention(dim_v, num_heads, batch_first=True)
         self.norm = nn.LayerNorm(dim_v)
@@ -72,6 +80,7 @@ class _CrossAttnDecoder(nn.Module):
         Returns:
             logits: [B*T, mask_size, mask_size]  (raw, before sigmoid)
         """
+        prompt = self.prompt_proj(prompt)
         attn_out, _ = self.cross_attn(query=visual_feat, key=prompt, value=prompt)
         visual_feat = self.norm(visual_feat + attn_out)  # residual
 
@@ -127,6 +136,8 @@ class RefAVSBaselineModel(nn.Module):
         mask_size: int = 256,
         image_size: int = 256,
         freeze_backbone: bool = False,
+        prompt_dim: int = 256,
+        cache_mem_beta: float = 1.0,
         **_,   # absorb leftover keys from config deep-merge (e.g. advance params)
     ):
         super().__init__()
@@ -143,8 +154,17 @@ class RefAVSBaselineModel(nn.Module):
         # This skips Mask2Former's slow Multiscale Deformable Attention pixel
         # decoder and 9-layer transformer module — cutting per-batch time
         # from ~1.8 s to ~0.1 s on a Kaggle T4 GPU.
+        loaded_pretrained = False
         if pretrained_m2f is not None:
-            _m2f = Mask2FormerModel.from_pretrained(pretrained_m2f)
+            try:
+                _m2f = Mask2FormerModel.from_pretrained(pretrained_m2f)
+                loaded_pretrained = True
+            except Exception as e:
+                print(
+                    f"[RefAVSBaselineModel] Failed to load pretrained Mask2Former "
+                    f"('{pretrained_m2f}'): {e}. Falling back to random init."
+                )
+                _m2f = Mask2FormerModel(Mask2FormerConfig())
         else:
             _m2f = Mask2FormerModel(Mask2FormerConfig())
 
@@ -153,11 +173,17 @@ class RefAVSBaselineModel(nn.Module):
         self._swin: nn.Module = _m2f.pixel_level_module.encoder
         del _m2f   # release pixel decoder + transformer module (~200 MB)
 
-        if freeze_backbone:
+        if freeze_backbone and loaded_pretrained:
             for p in self._swin.parameters():
                 p.requires_grad_(False)
+        elif freeze_backbone and not loaded_pretrained:
+            print(
+                "[RefAVSBaselineModel] freeze_backbone=True but pretrained weights "
+                "are unavailable. Keeping backbone trainable to avoid training collapse."
+            )
 
         self.dim_v = dim_v
+        self.cache_mem_beta = float(cache_mem_beta)
 
         # Spatial token count from Swin-Base last stage:
         # output stride = 32 → (image_size // 32)^2 tokens
@@ -178,11 +204,11 @@ class RefAVSBaselineModel(nn.Module):
             nn.ReLU(),
             nn.Linear(2048, dim_v),
         )
-        # prompt: dim_v → 256 (following the paper's prompt_proj)
+        # prompt: dim_v -> prompt_dim (paper uses 256)
         self.prompt_proj = nn.Sequential(
             nn.Linear(dim_v, 2048),
             nn.ReLU(),
-            nn.Linear(2048, dim_v),   # keep dim_v for decoder
+            nn.Linear(2048, prompt_dim),
         )
 
         # ---- fusion attention (paper: mha_A_T, mha_V_T, mha_mm) ----
@@ -195,7 +221,13 @@ class RefAVSBaselineModel(nn.Module):
         self.tag_V = nn.Parameter(torch.ones(1, 1, dim_v))
 
         # ---- segmentation decoder ----
-        self.decoder = _CrossAttnDecoder(dim_v, num_heads, mask_size, spatial_size)
+        self.decoder = _CrossAttnDecoder(
+            dim_v=dim_v,
+            num_heads=num_heads,
+            mask_size=mask_size,
+            spatial_size=spatial_size,
+            prompt_dim=prompt_dim,
+        )
 
     # ------------------------------------------------------------------
     # cached memory (paper: process_with_cached_memory)
@@ -209,7 +241,7 @@ class RefAVSBaselineModel(nn.Module):
         feat: [T, B, dim_v]  (seq_len, batch, dim)
         out:  [T, B, dim_v]
         """
-        beta = 1.0
+        beta = self.cache_mem_beta
         feat_beta = feat * (beta + 1)
         cum = torch.cumsum(feat, dim=0)
         idx = torch.arange(1, feat.size(0) + 1, device=feat.device,
@@ -303,13 +335,10 @@ class RefAVSBaselineModel(nn.Module):
         cue_T_from_V = fused_VT[tv:]        # [T_t, B, dim_v]
 
         # ---- 4. Cached memory differential encoding ----
-        # Reshape visual cues to [T, B*S, dim_v] for per-frame memory
-        cue_V_seq_ts = cue_V_seq.view(t, s, b, self.dim_v).permute(0, 2, 1, 3)
-        # cue_V_seq_ts: [T, B, S, dim_v] → process as [T, B*S, dim_v]
-        cue_V_flat = cue_V_seq_ts.contiguous().view(t, b * s, self.dim_v)
-        cue_V_diff = self._cached_memory(cue_V_flat)   # [T, B*S, dim_v]
-
-        cue_A_diff = self._cached_memory(cue_A_seq)    # [T_a, B, dim_v]
+        # Keep the same ordering as the reference code:
+        # cached memory is applied over flattened visual sequence [T*S, B, D].
+        cue_V_diff_flat = self._cached_memory(cue_V_seq)  # [T*S, B, D]
+        cue_A_diff = self._cached_memory(cue_A_seq)       # [T_a, B, D]
 
         # Combined text cue [B, T_t, dim_v]
         cue_T = (feat_txt +
@@ -317,18 +346,20 @@ class RefAVSBaselineModel(nn.Module):
                  cue_T_from_V.permute(1, 0, 2)) / 3.0
 
         # ---- 5. Per-frame multimodal prompt (paper: mha_mm) ----
-        # For each frame f, build: [A_diff[avg], tag_A, V_diff_f, tag_V, T_cue]
-        cue_A_mean = cue_A_diff.mean(dim=0, keepdim=True)  # [1, B, dim_v]
+        # For each frame f, build: [A_diff, tag_A, V_diff_f, tag_V, T_cue]
+        # following the original baseline implementation.
         tag_A = self.tag_A.expand(1, b, self.dim_v)        # [1, B, dim_v]
         tag_V = self.tag_V.expand(1, b, self.dim_v)        # [1, B, dim_v]
+        cue_V_bt = cue_V_diff_flat.permute(1, 0, 2).contiguous().view(b, t, s, self.dim_v)
+        cue_A_for_prompt = cue_A_diff
 
         prompts = []
         for f in range(t):
             # Visual cue for frame f: [B, S, dim_v] → permute [S, B, dim_v]
-            cue_V_f = cue_V_diff[f].view(b, s, self.dim_v).permute(1, 0, 2)  # [S, B, dim_v]
+            cue_V_f = cue_V_bt[:, f].permute(1, 0, 2)  # [S, B, dim_v]
             cue_T_perm = cue_T.permute(1, 0, 2)   # [T_t, B, dim_v]
 
-            mm_seq = torch.cat([cue_A_mean, tag_A, cue_V_f, tag_V, cue_T_perm], dim=0)
+            mm_seq = torch.cat([cue_A_for_prompt, tag_A, cue_V_f, tag_V, cue_T_perm], dim=0)
             mm_out, _ = self.mha_mm(mm_seq, mm_seq, mm_seq)
             mm_out = self.prompt_proj(mm_out.permute(1, 0, 2))  # [B, L, dim_v]
             prompts.append(mm_out)
