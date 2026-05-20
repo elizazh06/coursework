@@ -1,11 +1,10 @@
 class ConfigNode(dict):
-    """Dict with attribute access and recursive conversion."""
 
     def __init__(self, mapping=None, **kwargs):
         super().__init__()
         mapping = mapping or {}
         mapping.update(kwargs)
-        for key, value in mapping.items():
+        for (key, value) in mapping.items():
             self[key] = self._convert(value)
 
     def _convert(self, value):

@@ -1,28 +1,18 @@
 model:
   _target_: models.ref_avs_baseline.RefAVSBaselineModel
 
-  # HuggingFace model id for Mask2Former backbone.
-  # The first run will download ~350 MB to ~/.cache/huggingface/
-  # On Kaggle, add the model as a dataset or pre-cache it (see README).
   pretrained_m2f: facebook/mask2former-swin-base-ade-semantic
 
-  # Internal feature dimension (must match backbone encoder output channels).
-  # Swin-Base last stage → 1024 channels.
   dim_v: 1024
 
   num_heads: 8
   prompt_dim: 256
   cache_mem_beta: 1.0
 
-  # Audio: MelSpectrogram 128 mel bins (matches VGGish output dim)
   audio_dim: 128
-  # Text: DistilRoBERTa hidden size 768 (distilbert/distilroberta-base)
   text_dim: 768
 
-  # Output mask resolution (should match dataset.params.mask_size).
   mask_size: 256
-  image_size: 256   # must match dataset.params.image_size
+  image_size: 256
 
-  # Following the original paper: only fusion/projection layers are trained;
-  # backbone is frozen. This also avoids OOM on Kaggle T4/P100 GPUs.
   freeze_backbone: true

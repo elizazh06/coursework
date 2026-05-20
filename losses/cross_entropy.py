@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-
 class CrossEntropyLossWrapper(nn.Module):
+
     def __init__(self):
         super().__init__()
         self.loss = nn.CrossEntropyLoss()
@@ -11,4 +11,4 @@ class CrossEntropyLossWrapper(nn.Module):
         targets = labels if labels is not None else label
         if targets is None:
             raise ValueError("Batch should contain 'label' or 'labels'.")
-        return {"loss": self.loss(logits, targets)}
+        return {'loss': self.loss(logits, targets)}

@@ -3,10 +3,7 @@ model:
   num_classes: 13
   d_model: 768
   n_layers: 4
-  # d_state=16 matches mamba-130m-hf so in_proj/out_proj/conv/x_proj weights load correctly.
-  # With d_state=64 most HF weights fail the shape check and the download is wasteful.
   d_state: 16
-  # d_conv=4 matches the default in mamba-130m-hf.
   conv_kernel: 4
   expand: 2
   ff_mult: 4
@@ -17,8 +14,6 @@ model:
   max_video_tokens: 32
   max_audio_tokens: 64
   use_official_mamba_ssm: true
-  # Set to null to skip the download when you don't want pretrained Mamba weights,
-  # or keep the HF model name to load in_proj/out_proj/conv weights from mamba-130m.
   hf_pretrained_mamba_model: state-spaces/mamba-130m-hf
   auto_load_pretrained_mamba: false
   pretrained_mamba_path: null

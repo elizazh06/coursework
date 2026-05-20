@@ -1,93 +1,77 @@
-# ──────────────────────────────────────────────────────────────────────────
-# Ref-AVS-Bench dataset profile.
-#
-# Actual dataset layout (elizazh/ref-avs-bench-unpacked on Kaggle):
-#   <data_root>/metadata.csv              — vid, uid, fid, exp, split
+# Ref-AVS-Bench layout:
+#   <data_root>/metadata.csv
 #   <data_root>/media/<vid>/audio.wav
 #   <data_root>/media/<vid>/frames/{0..9}.jpg
-#   <data_root>/gt_mask/<vid>/fid_<fid>/0000{0..9}.png
+#   <data_root>/gt_mask/<vid>/fid_<fid>/{00000..00009}.png
 #
-# Usage (baseline):
-#   python train.py     dataset=ref_avs model=ref_avs_baseline \
-#       writer.run_name=ref_avs_baseline
-#   python inference.py dataset=ref_avs model=ref_avs_baseline \
+# Relative data_root is resolved in order: cwd, project dir, parent of project dir.
+# Example: repo at ~/coursework, dataset at ~/REFAVS → data_root=REFAVS works.
+#
+# Train (baseline):
+#   python train.py --config configs/train.yaml dataset=ref_avs model=ref_avs_baseline \
+#       writer.run_name=ref_avs_baseline dataset.params.data_root=REFAVS
+#
+# Inference (baseline):
+#   python inference.py --config configs/inference.yaml dataset=ref_avs model=ref_avs_baseline \
 #       writer.run_name=ref_avs_baseline \
-#       inferencer.from_pretrained=checkpoints/ref_avs_baseline/model_best.pth
+#       inferencer.from_pretrained=checkpoints/ref_avs_baseline/model_best.pth \
+#       dataset.params.data_root=REFAVS
 #
-# Usage (Mixture-of-Mamba segmentation):
-#   python train.py     dataset=ref_avs model=mixture_of_mamba_ref_avs \
+# Train (Mixture-of-Mamba):
+#   python train.py --config configs/train.yaml dataset=ref_avs model=mixture_of_mamba_ref_avs \
+#       writer.run_name=mixture_of_mamba_ref_avs dataset.params.data_root=REFAVS
+#
+# Inference (Mixture-of-Mamba):
+#   python inference.py --config configs/inference.yaml dataset=ref_avs model=mixture_of_mamba_ref_avs \
 #       writer.run_name=mixture_of_mamba_ref_avs \
-#       dataset.params.data_root=/path/to/ref-avs-bench-unpacked
-#   python inference.py dataset=ref_avs model=mixture_of_mamba_ref_avs \
-#       writer.run_name=mixture_of_mamba_ref_avs \
-#       inferencer.from_pretrained=checkpoints/mixture_of_mamba_ref_avs/model_best.pth
-# ──────────────────────────────────────────────────────────────────────────
+#       inferencer.from_pretrained=checkpoints/mixture_of_mamba_ref_avs/model_best.pth \
+#       dataset.params.data_root=REFAVS
 
 dataset:
   module: ref_avs
   name: RefAVSDataset
-  batch_size: 1          # 1 sample = 10 frames through Swin-Base; keep at 1
+  batch_size: 1
   eval_batch_size: 1
-  # With use_cache=true the text encoder is not called in __getitem__, so
-  # worker processes only do disk I/O + image decoding — safe to parallelise.
   num_workers: 4
   prefetch_factor: 4
   persistent_workers: true
   timeout: 0
-  pin_memory: true       # faster CPU→GPU tensor transfer
+  pin_memory: true
   params:
-    # Path to the unpacked dataset on Kaggle.
-    # Override at runtime:
-    #   dataset.params.data_root=/kaggle/input/ref-avs-bench-unpacked
-    data_root: /kaggle/input/ref-avs-bench-unpacked
-
-    frame_n: 10           # frames per clip (fixed in original code)
-    mask_size: 256        # GT and output mask resolution H = W
-    image_size: 256       # frame resize fed to backbone
-
-    sample_rate: 16000    # audio resampling target
-
-    # Text model — same as official code (distilbert/distilroberta-base)
+    data_root: REFAVS
+    frame_n: 10
+    mask_size: 256
+    image_size: 256
+    sample_rate: 16000
     text_model: distilbert/distilroberta-base
     text_max_len: 25
-
-    # Feature cache (text + audio pre-extracted once, ~600 MB total).
-    # First run builds the cache (~10 min); all subsequent runs load from disk
-    # and reduce per-sample latency from ~600 ms → ~2 ms.
     use_cache: true
-    cache_root: /kaggle/working/ref_avs_cache
+    cache_root: null
     rebuild_cache: false
 
-# ── Trainer overrides (segmentation task, not classification) ─────────────
 trainer:
   n_epochs: 30
   monitor: "max val_mean_iou"
   early_stop: 8
   log_step: 20
-  # Validate every 2 epochs and only on val split to reduce epoch wall-clock.
   eval_every: 2
   eval_parts: ["val"]
-  # Grad norm is expensive for large segmentation models: log it sparsely.
   grad_norm_every: 100
-  # AMP gives substantial speedup on Kaggle GPUs (T4/P100/L4).
   use_amp: true
   amp_dtype: fp16
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
 
-# ── Inferencer overrides ───────────────────────────────────────────────────
 inferencer:
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
   save_path: ref_avs_inference
   from_pretrained: checkpoints/ref_avs_baseline/model_best.pth
   metrics_filename: test_metrics.json
 
-# ── Loss (BCE + Dice instead of cross-entropy) ────────────────────────────
 loss_function:
   _target_: losses.segmentation.SegmentationLoss
   bce_weight: 1.0
   dice_weight: 1.0
 
-# ── Metrics ───────────────────────────────────────────────────────────────
 metrics:
   train:
     - _target_: metrics.segmentation_metrics.MeanIoUMetric
@@ -100,7 +84,6 @@ metrics:
     - _target_: metrics.segmentation_metrics.JAndFMetric
       name: j_and_f
 
-# ── Optimizer / scheduler ─────────────────────────────────────────────────
 optimizer:
   _target_: torch.optim.AdamW
   lr: 1.0e-4
@@ -111,7 +94,6 @@ lr_scheduler:
   T_max: 30
   eta_min: 1.0e-6
 
-# ── Writer ────────────────────────────────────────────────────────────────
 writer:
   run_name: ref_avs_train
   loss_names: ["loss", "bce_loss", "dice_loss"]

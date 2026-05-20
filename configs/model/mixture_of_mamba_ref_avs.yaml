@@ -3,7 +3,6 @@ model:
 
   d_model: 768
   n_layers: 4
-  # Match mamba-130m-hf for HF weight transfer
   d_state: 16
   conv_kernel: 4
   expand: 2
@@ -12,12 +11,10 @@ model:
   top_k: 2
   dropout: 0.1
 
-  # Ref-AVS pre-extracted feature dims (see datasets/ref_avs.py)
   audio_dim: 128
   text_dim: 768
   max_text_tokens: 25
 
-  # Must match dataset.params.mask_size / image_size
   mask_size: 256
   image_size: 256
 

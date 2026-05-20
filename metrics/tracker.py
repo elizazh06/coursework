@@ -1,4 +1,5 @@
 class MetricTracker:
+
     def __init__(self, *keys, writer=None):
         self.writer = writer
         self._keys = list(keys)
