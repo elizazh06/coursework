@@ -1,7 +1,12 @@
-from pathlib import Path
+from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+try:
+    from transformers import Mask2FormerConfig, Mask2FormerModel
+    _HF_AVAILABLE = True
+except ImportError:
+    _HF_AVAILABLE = False
 
 class RMSNorm(nn.Module):
 
@@ -30,12 +35,10 @@ class SelectiveStateSpaceMixer(nn.Module):
         self.act = nn.SiLU()
 
     def forward(self, x):
-        (bsz, seq_len, _) = x.shape
+        bsz, seq_len, _ = x.shape
         xz = self.in_proj(x)
-        (x_main, gate) = xz.chunk(2, dim=-1)
-        x_main = x_main.transpose(1, 2)
-        x_main = self.dw_conv(x_main)[..., :seq_len]
-        x_main = x_main.transpose(1, 2)
+        x_main, gate = xz.chunk(2, dim=-1)
+        x_main = self.dw_conv(x_main.transpose(1, 2))[..., :seq_len].transpose(1, 2)
         x_main = self.act(x_main)
         dt = torch.sigmoid(self.dt_proj(x_main))
         B = self.B_proj(x_main)
@@ -44,8 +47,7 @@ class SelectiveStateSpaceMixer(nn.Module):
         outputs = []
         for t in range(seq_len):
             state = (1.0 - dt[:, t]) * state + dt[:, t] * B[:, t]
-            yt = C[:, t] * state
-            outputs.append(yt)
+            outputs.append(C[:, t] * state)
         y = torch.stack(outputs, dim=1)
         y = F.layer_norm(y, (y.size(-1),))
         y = self.state_to_inner(y)
@@ -66,11 +68,158 @@ class OfficialMambaMixer(nn.Module):
     def forward(self, x):
         return self.mamba(x)
 
+class MambaSequenceBlock(nn.Module):
+
+    def __init__(self, d_model, d_state=16, conv_kernel=4, expand=2, ff_mult=4, dropout=0.1, use_official_mamba_ssm=True):
+        super().__init__()
+        self.norm1 = RMSNorm(d_model)
+        self.mixer = OfficialMambaMixer(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand) if use_official_mamba_ssm else SelectiveStateSpaceMixer(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand)
+        self.norm2 = RMSNorm(d_model)
+        self.ffn = nn.Sequential(nn.Linear(d_model, d_model * ff_mult), nn.GELU(), nn.Dropout(dropout), nn.Linear(d_model * ff_mult, d_model))
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        x = x + self.dropout(self.mixer(self.norm1(x)))
+        x = x + self.dropout(self.ffn(self.norm2(x)))
+        return x
+
+class MambaPretrainedMixin:
+
+    def _load_pretrained_mamba_from_hf(self, hf_model_name, containers):
+        try:
+            from transformers import AutoModelForCausalLM
+        except ImportError as e:
+            raise ImportError('transformers is required for HF Mamba loading.') from e
+        try:
+            src_state = AutoModelForCausalLM.from_pretrained(hf_model_name, trust_remote_code=True).state_dict()
+        except Exception as e:
+            print(f'[{type(self).__name__}] HF Mamba load failed ({e}); continuing with random Mamba init.')
+            return
+        dst_state = self.state_dict()
+        mapped = {}
+        src_layer_idx = 0
+        for container_name in containers:
+            container = getattr(self, container_name, None)
+            if container is None:
+                continue
+            for dst_layer_idx in range(len(container)):
+                src_prefix = f'backbone.layers.{src_layer_idx}.mixer.'
+                dst_prefix = f'{container_name}.{dst_layer_idx}.mixer.mamba.'
+                layer_has_any = False
+                for src_key, value in src_state.items():
+                    if not src_key.startswith(src_prefix):
+                        continue
+                    layer_has_any = True
+                    dst_key = dst_prefix + src_key[len(src_prefix):]
+                    if dst_key in dst_state and dst_state[dst_key].shape == value.shape:
+                        mapped[dst_key] = value
+                if not layer_has_any:
+                    break
+                src_layer_idx += 1
+        if mapped:
+            self.load_state_dict(mapped, strict=False)
+            print(f'[{type(self).__name__}] Loaded {len(mapped)} tensors from HF Mamba: {hf_model_name}')
+
+    def _load_pretrained_mamba_checkpoint(self, pretrained_path, prefix='', allowed_prefixes=()):
+        ckpt = torch.load(pretrained_path, map_location='cpu')
+        src_state = ckpt.get('state_dict', ckpt)
+        if not isinstance(src_state, dict):
+            return
+        if prefix:
+            pref = prefix if prefix.endswith('.') else f'{prefix}.'
+            src_state = {k[len(pref):]: v for k, v in src_state.items() if k.startswith(pref)}
+        dst_state = self.state_dict()
+        to_load = {k: v for k, v in src_state.items() if (not allowed_prefixes or k.startswith(allowed_prefixes)) and k in dst_state and dst_state[k].shape == v.shape}
+        if to_load:
+            self.load_state_dict(to_load, strict=False)
+            print(f'[{type(self).__name__}] Loaded {len(to_load)} tensors from {pretrained_path}')
+
+class Mask2FormerFrameEncoder(nn.Module):
+
+    def __init__(self, d_model, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True):
+        super().__init__()
+        if not _HF_AVAILABLE:
+            raise ImportError('transformers is required for Mask2FormerFrameEncoder.')
+        loaded_pretrained = False
+        if pretrained_visual_model is not None:
+            try:
+                model = Mask2FormerModel.from_pretrained(pretrained_visual_model)
+                loaded_pretrained = True
+            except Exception as e:
+                print(f"[Mask2FormerFrameEncoder] Failed to load pretrained Mask2Former ('{pretrained_visual_model}'): {e}. Falling back to random init.")
+                model = Mask2FormerModel(Mask2FormerConfig())
+        else:
+            model = Mask2FormerModel(Mask2FormerConfig())
+        self.encoder = model.pixel_level_module.encoder
+        del model
+        if freeze_visual_backbone and loaded_pretrained:
+            for p in self.encoder.parameters():
+                p.requires_grad_(False)
+        self.proj = nn.LazyConv2d(d_model, kernel_size=1)
+
+    def forward(self, frames):
+        b, t, c, h, w = frames.shape
+        x = frames.view(b * t, c, h, w)
+        frozen = not next(self.encoder.parameters()).requires_grad
+        if frozen:
+            with torch.no_grad():
+                out = self.encoder(pixel_values=x)
+        else:
+            out = self.encoder(pixel_values=x)
+        fmap = out.feature_maps[-1]
+        if fmap.dim() == 3:
+            s = int(fmap.size(1) ** 0.5)
+            fmap = fmap.transpose(1, 2).contiguous().view(fmap.size(0), fmap.size(2), s, s)
+        elif fmap.dim() == 4 and fmap.size(1) < fmap.size(-1):
+            fmap = fmap.permute(0, 3, 1, 2).contiguous()
+        spatial = self.proj(fmap)
+        tokens = spatial.mean(dim=(-1, -2)).view(b, t, -1)
+        return spatial.view(b, t, *spatial.shape[1:]), tokens
+
+class MaskDecoder(nn.Module):
+
+    def __init__(self, d_model, mask_size):
+        super().__init__()
+        self.mask_size = int(mask_size)
+        self.fuse = nn.Sequential(nn.Conv2d(d_model * 2, d_model, kernel_size=3, padding=1), nn.GELU(), nn.Conv2d(d_model, d_model // 2, kernel_size=3, padding=1), nn.GELU(), nn.Conv2d(d_model // 2, 1, kernel_size=1))
+
+    def forward(self, query, spatial):
+        query_map = query.unsqueeze(-1).unsqueeze(-1).expand_as(spatial)
+        logits = self.fuse(torch.cat([spatial, query_map], dim=1))
+        logits = F.interpolate(logits, size=(self.mask_size, self.mask_size), mode='bilinear', align_corners=False)
+        return logits.squeeze(1)
+
+class BaseAVSceneModel(nn.Module, MambaPretrainedMixin):
+
+    def __init__(self, d_model=768, audio_dim=128, text_dim=768, max_audio_tokens=10, max_text_tokens=25, mask_size=256, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True, dropout=0.1):
+        super().__init__()
+        self.max_audio_tokens = int(max_audio_tokens)
+        self.max_text_tokens = int(max_text_tokens)
+        self.text_dim = int(text_dim)
+        self.visual_encoder = Mask2FormerFrameEncoder(d_model=d_model, pretrained_visual_model=pretrained_visual_model, freeze_visual_backbone=freeze_visual_backbone)
+        self.audio_proj = nn.Linear(audio_dim, d_model)
+        self.text_proj = nn.Linear(text_dim, d_model)
+        self.decoder = MaskDecoder(d_model=d_model, mask_size=mask_size)
+        self.dropout = nn.Dropout(dropout)
+
+    def _project_inputs(self, frames, audio_feat, text_feat=None):
+        if text_feat is None:
+            text_feat = frames.new_zeros(frames.size(0), 1, self.text_dim)
+        spatial, video_tokens = self.visual_encoder(frames)
+        audio_tokens = self.audio_proj(audio_feat[:, :self.max_audio_tokens])
+        text_tokens = self.text_proj(text_feat[:, :self.max_text_tokens])
+        return spatial, video_tokens, audio_tokens, text_tokens
+
+    def _decode(self, queries, spatial):
+        logits = []
+        for idx in range(queries.size(1)):
+            logits.append(self.decoder(queries[:, idx], spatial[:, idx]))
+        return torch.cat(logits, dim=0)
+
 class MoEFeedForward(nn.Module):
 
     def __init__(self, d_model, ff_mult=4, num_experts=4, top_k=2, dropout=0.1):
         super().__init__()
-        self.num_experts = num_experts
         self.top_k = min(top_k, num_experts)
         hidden = d_model * ff_mult
         self.gate = nn.Linear(d_model, num_experts)
@@ -78,10 +227,10 @@ class MoEFeedForward(nn.Module):
 
     def forward(self, x):
         logits = self.gate(x)
-        (top_vals, top_idx) = torch.topk(logits, k=self.top_k, dim=-1)
+        top_vals, top_idx = torch.topk(logits, k=self.top_k, dim=-1)
         top_probs = torch.softmax(top_vals, dim=-1)
         out = torch.zeros_like(x)
-        for (expert_id, expert) in enumerate(self.experts):
+        for expert_id, expert in enumerate(self.experts):
             expert_out = expert(x)
             match = (top_idx == expert_id).float()
             weight = (top_probs * match).sum(dim=-1, keepdim=True)
@@ -90,13 +239,10 @@ class MoEFeedForward(nn.Module):
 
 class MixtureOfMambaBlock(nn.Module):
 
-    def __init__(self, d_model, d_state=64, conv_kernel=3, expand=2, ff_mult=4, num_experts=4, top_k=2, dropout=0.1, mixer_backend='custom'):
+    def __init__(self, d_model, d_state=64, conv_kernel=3, expand=2, ff_mult=4, num_experts=4, top_k=2, dropout=0.1, use_official_mamba_ssm=True):
         super().__init__()
         self.norm1 = RMSNorm(d_model)
-        if mixer_backend == 'official':
-            self.mixer = OfficialMambaMixer(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand)
-        else:
-            self.mixer = SelectiveStateSpaceMixer(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand)
+        self.mixer = OfficialMambaMixer(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand) if use_official_mamba_ssm else SelectiveStateSpaceMixer(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand)
         self.norm2 = RMSNorm(d_model)
         self.moe = MoEFeedForward(d_model=d_model, ff_mult=ff_mult, num_experts=num_experts, top_k=top_k, dropout=dropout)
         self.dropout = nn.Dropout(dropout)
@@ -106,206 +252,40 @@ class MixtureOfMambaBlock(nn.Module):
         x = x + self.dropout(self.moe(self.norm2(x)))
         return x
 
-class MixtureOfMambaModel(nn.Module):
+class MixtureOfMambaModel(BaseAVSceneModel):
 
-    def __init__(self, num_classes=13, d_model=768, hidden_dim=None, n_layers=4, d_state=64, conv_kernel=3, expand=2, ff_mult=4, num_experts=4, top_k=2, dropout=0.1, vocab_size=5000, max_video_tokens=32, max_audio_tokens=64, use_official_mamba_ssm=True, hf_pretrained_mamba_model='state-spaces/mamba-130m-hf', auto_load_pretrained_mamba=False, pretrained_mamba_path=None, pretrained_mamba_prefix='', freeze_mamba=False, **_):
-        super().__init__()
+    def __init__(self, d_model=768, hidden_dim=None, n_layers=4, d_state=16, conv_kernel=4, expand=2, ff_mult=4, num_experts=4, top_k=2, dropout=0.1, audio_dim=128, text_dim=768, max_audio_tokens=10, max_text_tokens=25, mask_size=256, image_size=256, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True, use_official_mamba_ssm=True, hf_pretrained_mamba_model='state-spaces/mamba-130m-hf', auto_load_pretrained_mamba=False, pretrained_mamba_path=None, pretrained_mamba_prefix='', freeze_mamba=False, **_):
         if hidden_dim is not None:
             d_model = int(hidden_dim)
-        self.max_video_tokens = max_video_tokens
-        self.max_audio_tokens = max_audio_tokens
-        self.image_stem = nn.Sequential(nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3), nn.BatchNorm2d(64), nn.GELU(), nn.AdaptiveAvgPool2d((1, 1)))
-        self.video_proj = nn.LazyLinear(d_model)
-        self.audio_proj = nn.LazyLinear(d_model)
-        self.question_embedding = nn.Embedding(vocab_size, d_model)
-        self.question_proj = nn.Linear(d_model, d_model)
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, d_model))
+        super().__init__(d_model=d_model, audio_dim=audio_dim, text_dim=text_dim, max_audio_tokens=max_audio_tokens, max_text_tokens=max_text_tokens, mask_size=mask_size, pretrained_visual_model=pretrained_visual_model, freeze_visual_backbone=freeze_visual_backbone, dropout=dropout)
+        self.blocks = nn.ModuleList([MixtureOfMambaBlock(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand, ff_mult=ff_mult, num_experts=num_experts, top_k=top_k, dropout=dropout, use_official_mamba_ssm=use_official_mamba_ssm) for _ in range(n_layers)])
+        self.blocks_norm = RMSNorm(d_model)
         self.modality_embed = nn.Parameter(torch.zeros(1, 4, d_model))
-        self.pos_embed = nn.Parameter(torch.zeros(1, 1 + max_video_tokens + max_audio_tokens + 1, d_model))
-        if use_official_mamba_ssm:
-            try:
-                import mamba_ssm
-            except ImportError as e:
-                raise ImportError('Official Mamba backend is enabled by default but `mamba-ssm` is missing. Install with: `pip install mamba-ssm --no-build-isolation`') from e
-        self.blocks = nn.ModuleList([MixtureOfMambaBlock(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand, ff_mult=ff_mult, num_experts=num_experts, top_k=top_k, dropout=dropout, mixer_backend='official' if use_official_mamba_ssm else 'custom') for _ in range(n_layers)])
-        self.norm = RMSNorm(d_model)
-        self.head = nn.Linear(d_model, num_classes)
-        self.dropout = nn.Dropout(dropout)
-        nn.init.trunc_normal_(self.cls_token, std=0.02)
+        self.mask_query = nn.Parameter(torch.zeros(1, 1, d_model))
+        self.pos_embed = nn.Parameter(torch.zeros(1, 10 + max_audio_tokens + max_text_tokens + 10, d_model))
         nn.init.trunc_normal_(self.modality_embed, std=0.02)
+        nn.init.trunc_normal_(self.mask_query, std=0.02)
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
         if hf_pretrained_mamba_model:
-            self._load_pretrained_mamba_from_hf(hf_pretrained_mamba_model)
-        auto_path = None
-        if auto_load_pretrained_mamba and (not pretrained_mamba_path):
-            auto_path = self._find_default_mamba_checkpoint()
-        effective_pretrained_path = pretrained_mamba_path or auto_path
-        if effective_pretrained_path:
-            self._load_pretrained_mamba(pretrained_path=effective_pretrained_path, prefix=pretrained_mamba_prefix)
-        elif auto_load_pretrained_mamba:
-            print('[MixtureOfMambaModel] Auto pretrained Mamba checkpoint was not found. Training starts from random initialization for Mamba blocks.')
+            self._load_pretrained_mamba_from_hf(hf_pretrained_mamba_model, ('blocks',))
+        if pretrained_mamba_path:
+            self._load_pretrained_mamba_checkpoint(pretrained_mamba_path, pretrained_mamba_prefix, ('blocks.', 'blocks_norm.'))
         if freeze_mamba:
-            self._freeze_mamba_blocks()
-
-    def _find_default_mamba_checkpoint(self):
-        project_root = Path(__file__).resolve().parents[1]
-        candidates = [project_root / 'checkpoints' / 'mixture_of_mamba' / 'model_best.pth', project_root / 'checkpoints' / 'mixture_of_mamba' / 'model_last.pth', project_root / 'checkpoints' / 'mixture_of_mamba_advance' / 'model_best.pth', project_root / 'checkpoints' / 'mixture_of_mamba_advance' / 'model_last.pth', project_root / 'checkpoints' / 'mamba' / 'model_best.pth', project_root / 'checkpoints' / 'mamba' / 'model_last.pth']
-        for path in candidates:
-            if path.exists():
-                return str(path)
-        return None
-
-    def _freeze_mamba_blocks(self):
-        for p in self.blocks.parameters():
-            p.requires_grad = False
-        if hasattr(self, 'norm'):
-            for p in self.norm.parameters():
+            for p in self.blocks.parameters():
+                p.requires_grad = False
+            for p in self.blocks_norm.parameters():
                 p.requires_grad = False
 
-    def _load_pretrained_mamba(self, pretrained_path, prefix=''):
-        ckpt = torch.load(pretrained_path, map_location='cpu')
-        src_state = ckpt.get('state_dict', ckpt)
-        if not isinstance(src_state, dict):
-            print(f"[MixtureOfMambaModel] Unexpected checkpoint format at {pretrained_path}. Expected dict or dict with 'state_dict'. Skipping pretrained load.")
-            return
-        if prefix:
-            normalized = {}
-            pref = prefix if prefix.endswith('.') else f'{prefix}.'
-            for (k, v) in src_state.items():
-                if k.startswith(pref):
-                    normalized[k[len(pref):]] = v
-            src_state = normalized
-        dst_state = self.state_dict()
-        allowed_prefixes = ('blocks.', 'norm.')
-        to_load = {}
-        for (k, v) in src_state.items():
-            if not k.startswith(allowed_prefixes):
-                continue
-            if k in dst_state and dst_state[k].shape == v.shape:
-                to_load[k] = v
-        if not to_load:
-            print('[MixtureOfMambaModel] No matching Mamba block weights found. Check checkpoint key names/shapes and pretrained_mamba_prefix.')
-            return
-        self.load_state_dict(to_load, strict=False)
-        print(f'[MixtureOfMambaModel] Loaded {len(to_load)} tensors from pretrained Mamba checkpoint: {pretrained_path}')
-
-    def _load_pretrained_mamba_from_hf(self, hf_model_name):
-        try:
-            from transformers import AutoModelForCausalLM
-        except ImportError as e:
-            raise ImportError('transformers is required for HF Mamba loading. Install with `pip install transformers`.') from e
-        if not any((isinstance(block.mixer, OfficialMambaMixer) for block in self.blocks)):
-            print('[MixtureOfMambaModel] HF Mamba weight loading expects official mamba-ssm backend. Skipping because current model uses custom mixer.')
-            return
-        src_state = None
-        try:
-            hf_model = AutoModelForCausalLM.from_pretrained(hf_model_name, trust_remote_code=True)
-            src_state = hf_model.state_dict()
-        except Exception as e:
-            print(f'[MixtureOfMambaModel] AutoModelForCausalLM loading failed, trying direct safetensors download from Hugging Face. Original error: {e}')
-            src_state = self._load_hf_state_dict_without_model_init(hf_model_name)
-            if src_state is None:
-                print('[MixtureOfMambaModel] Failed to load HF pretrained weights; continuing with random initialization.')
-                return
-        dst_state = self.state_dict()
-        mapped = {}
-        layer_idx = 0
-        while layer_idx < len(self.blocks):
-            src_prefix = f'backbone.layers.{layer_idx}.mixer.'
-            dst_prefix = f'blocks.{layer_idx}.mixer.mamba.'
-            layer_has_any = False
-            for (src_key, value) in src_state.items():
-                if not src_key.startswith(src_prefix):
-                    continue
-                layer_has_any = True
-                dst_key = dst_prefix + src_key[len(src_prefix):]
-                if dst_key in dst_state and dst_state[dst_key].shape == value.shape:
-                    mapped[dst_key] = value
-            if not layer_has_any:
-                break
-            layer_idx += 1
-        if 'backbone.norm_f.weight' in src_state and 'norm.weight' in dst_state:
-            if src_state['backbone.norm_f.weight'].shape == dst_state['norm.weight'].shape:
-                mapped['norm.weight'] = src_state['backbone.norm_f.weight']
-        if not mapped:
-            print('[MixtureOfMambaModel] Could not map any weights from HF Mamba model. Likely hidden size mismatch (e.g., HF 768/1024/...) vs model d_model.')
-            return
-        self.load_state_dict(mapped, strict=False)
-        print(f'[MixtureOfMambaModel] Loaded {len(mapped)} tensors from HF model: {hf_model_name}')
-
-    def _load_hf_state_dict_without_model_init(self, hf_model_name):
-        try:
-            from huggingface_hub import hf_hub_download
-        except ImportError:
-            print('[MixtureOfMambaModel] `huggingface_hub` is missing; cannot download HF checkpoint tensors directly.')
-            return None
-        try:
-            safetensors_path = hf_hub_download(repo_id=hf_model_name, filename='model.safetensors')
-            try:
-                from safetensors.torch import load_file as safe_load_file
-            except ImportError:
-                print('[MixtureOfMambaModel] `safetensors` is missing; cannot read model.safetensors.')
-                return None
-            return safe_load_file(safetensors_path)
-        except Exception:
-            pass
-        try:
-            bin_path = hf_hub_download(repo_id=hf_model_name, filename='pytorch_model.bin')
-            return torch.load(bin_path, map_location='cpu')
-        except Exception as e:
-            print(f'[MixtureOfMambaModel] Could not download HF checkpoint tensors from {hf_model_name}. Error: {e}')
-            return None
-
-    def _encode_video(self, video):
-        (bsz, timesteps) = video.shape[:2]
-        if video.dim() != 5:
-            raise ValueError(f'Expected video shape [B, T, C, H, W], got {tuple(video.shape)}')
-        c = video.size(2)
-        if c == 3:
-            frames = video.view(bsz * timesteps, c, video.size(3), video.size(4))
-            feat = self.image_stem(frames).flatten(1)
-            feat = feat.view(bsz, timesteps, -1)
-        else:
-            feat = video.mean(dim=(-1, -2))
-        if feat.size(1) > self.max_video_tokens:
-            feat = feat[:, :self.max_video_tokens]
-        return self.video_proj(feat)
-
-    def _encode_audio(self, audio):
-        if audio.dim() == 2:
-            audio = audio.unsqueeze(1)
-        if audio.dim() != 3:
-            raise ValueError(f'Expected audio shape [B, T, F], got {tuple(audio.shape)}')
-        if audio.size(1) > self.max_audio_tokens:
-            audio = audio[:, :self.max_audio_tokens]
-        return self.audio_proj(audio)
-
-    def _encode_question(self, question, batch_size, device):
-        if question is None:
-            return torch.zeros(batch_size, 1, self.question_proj.out_features, device=device)
-        if question.dim() == 1:
-            question = question.unsqueeze(1)
-        if question.dim() != 2:
-            question = question.view(batch_size, -1)
-        q = self.question_embedding(question.long().clamp(min=0))
-        q = self.question_proj(q.mean(dim=1, keepdim=True))
-        return q
-
-    def forward(self, video, audio, question=None):
-        bsz = video.size(0)
-        device = video.device
-        v_tokens = self._encode_video(video)
-        a_tokens = self._encode_audio(audio)
-        q_token = self._encode_question(question, bsz, device)
-        cls = self.cls_token.expand(bsz, -1, -1)
-        v_tokens = v_tokens + self.modality_embed[:, 0:1]
-        a_tokens = a_tokens + self.modality_embed[:, 1:2]
-        q_token = q_token + self.modality_embed[:, 2:3]
-        cls = cls + self.modality_embed[:, 3:4]
-        x = torch.cat([v_tokens, a_tokens, q_token, cls], dim=1)
-        x = x + self.pos_embed[:, :x.size(1)]
-        x = self.dropout(x)
+    def forward(self, frames, audio_feat, text_feat=None, masks=None, **_):
+        del masks
+        spatial, video_tokens, audio_tokens, text_tokens = self._project_inputs(frames, audio_feat, text_feat)
+        b, t = video_tokens.shape[:2]
+        queries = self.mask_query.expand(b, t, -1)
+        x = torch.cat([video_tokens + self.modality_embed[:, 0:1], audio_tokens + self.modality_embed[:, 1:2], text_tokens + self.modality_embed[:, 2:3], queries + self.modality_embed[:, 3:4]], dim=1)
+        x = self.dropout(x + self.pos_embed[:, :x.size(1)])
         for block in self.blocks:
             x = block(x)
-        x = self.norm(x[:, -1])
-        return self.head(x)
+        x = self.blocks_norm(x)
+        q_start = t + audio_tokens.size(1) + text_tokens.size(1)
+        queries = x[:, q_start:q_start + t]
+        return {'logits': self._decode(queries, spatial)}

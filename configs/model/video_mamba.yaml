@@ -1,10 +1,5 @@
-# Train:
-#   python train.py --config configs/train.yaml dataset=ref_avs model=video_mamba_avs writer.run_name=video_mamba_avs dataset.params.data_root=REFAVS
-# Inference:
-#   python inference.py --config configs/inference.yaml dataset=ref_avs model=video_mamba_avs inferencer.from_pretrained=checkpoints/video_mamba_avs/model_best.pth dataset.params.data_root=REFAVS
-
 model:
-  _target_: models.video_mamba_avs.VideoMambaAVSModel
+  _target_: models.video_mamba.VideoMambaModel
 
   d_model: 768
   n_visual_layers: 2

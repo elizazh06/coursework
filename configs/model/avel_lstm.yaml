@@ -1,0 +1,19 @@
+model:
+  _target_: models.avel_lstm.AVELLSTMModel
+
+  d_model: 512
+  lstm_hidden: 256
+  n_lstm_layers: 2
+  dropout: 0.1
+
+  audio_dim: 128
+  text_dim: 768
+  max_audio_tokens: 10
+  max_text_tokens: 25
+
+  mask_size: 256
+  image_size: 256
+
+  pretrained_visual_model: facebook/mask2former-swin-base-ade-semantic
+  freeze_visual_backbone: true
+  freeze_audio_adapter: false

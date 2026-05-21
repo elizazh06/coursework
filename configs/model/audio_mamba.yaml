@@ -1,23 +1,25 @@
 model:
-  _target_: models.mixture_of_mamba_ref_avs.MixtureOfMambaRefAVSModel
+  _target_: models.audio_mamba.AudioMambaModel
 
   d_model: 768
-  n_layers: 4
+  n_audio_layers: 2
+  n_fusion_layers: 2
   d_state: 16
   conv_kernel: 4
   expand: 2
   ff_mult: 4
-  num_experts: 4
-  top_k: 2
   dropout: 0.1
 
   audio_dim: 128
   text_dim: 768
+  max_audio_tokens: 10
   max_text_tokens: 25
 
   mask_size: 256
   image_size: 256
 
+  pretrained_visual_model: facebook/mask2former-swin-base-ade-semantic
+  freeze_visual_backbone: true
   use_official_mamba_ssm: true
   hf_pretrained_mamba_model: state-spaces/mamba-130m-hf
   pretrained_mamba_path: null

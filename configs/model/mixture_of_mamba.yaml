@@ -1,6 +1,6 @@
 model:
   _target_: models.mixture_of_mamba.MixtureOfMambaModel
-  num_classes: 13
+
   d_model: 768
   n_layers: 4
   d_state: 16
@@ -10,9 +10,17 @@ model:
   num_experts: 4
   top_k: 2
   dropout: 0.1
-  vocab_size: 5000
-  max_video_tokens: 32
-  max_audio_tokens: 64
+
+  audio_dim: 128
+  text_dim: 768
+  max_audio_tokens: 10
+  max_text_tokens: 25
+
+  mask_size: 256
+  image_size: 256
+
+  pretrained_visual_model: facebook/mask2former-swin-base-ade-semantic
+  freeze_visual_backbone: true
   use_official_mamba_ssm: true
   hf_pretrained_mamba_model: state-spaces/mamba-130m-hf
   auto_load_pretrained_mamba: false

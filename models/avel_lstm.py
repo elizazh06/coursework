@@ -1,12 +1,12 @@
 from __future__ import annotations
 import torch
 import torch.nn as nn
-from models.ssm_avs_common import BaseSSMAVSModel
+from models.mixture_of_mamba import BaseAVSceneModel
 
 
-class AVELLSTMAVSModel(BaseSSMAVSModel):
+class AVELLSTMModel(BaseAVSceneModel):
 
-    def __init__(self, d_model: int=512, lstm_hidden: int=256, n_lstm_layers: int=2, dropout: float=0.1, max_audio_tokens: int=10, max_text_tokens: int=25, mask_size: int=256, audio_dim: int=128, text_dim: int=768, pretrained_visual_model: str | None='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone: bool=True, freeze_audio_adapter: bool=False, **_):
+    def __init__(self, d_model=512, lstm_hidden=256, n_lstm_layers=2, dropout=0.1, max_audio_tokens=10, max_text_tokens=25, mask_size=256, audio_dim=128, text_dim=768, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True, freeze_audio_adapter=False, **_):
         super().__init__(d_model=d_model, audio_dim=audio_dim, text_dim=text_dim, max_audio_tokens=max_audio_tokens, max_text_tokens=max_text_tokens, mask_size=mask_size, pretrained_visual_model=pretrained_visual_model, freeze_visual_backbone=freeze_visual_backbone, dropout=dropout)
         self.audio_context = nn.Sequential(nn.Linear(d_model, d_model), nn.GELU(), nn.Dropout(dropout), nn.Linear(d_model, d_model))
         self.text_context = nn.Sequential(nn.Linear(d_model, d_model), nn.GELU(), nn.Dropout(dropout), nn.Linear(d_model, d_model))
@@ -19,7 +19,7 @@ class AVELLSTMAVSModel(BaseSSMAVSModel):
                 for p in module.parameters():
                     p.requires_grad = False
 
-    def forward(self, frames: torch.Tensor, audio_feat: torch.Tensor, text_feat: torch.Tensor, masks: torch.Tensor | None=None, **_) -> dict:
+    def forward(self, frames, audio_feat, text_feat=None, masks=None, **_):
         del masks
         spatial, video_tokens, audio_tokens, text_tokens = self._project_inputs(frames, audio_feat, text_feat)
         t = video_tokens.size(1)

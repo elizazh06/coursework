@@ -1,14 +1,9 @@
-# Train:
-#   python train.py --config configs/train.yaml dataset=ref_avs model=audio_mamba_avs writer.run_name=audio_mamba_avs dataset.params.data_root=REFAVS
-# Inference:
-#   python inference.py --config configs/inference.yaml dataset=ref_avs model=audio_mamba_avs inferencer.from_pretrained=checkpoints/audio_mamba_avs/model_best.pth dataset.params.data_root=REFAVS
-
 model:
-  _target_: models.audio_mamba_avs.AudioMambaAVSModel
+  _target_: models.mamba_vl.MambaVLModel
 
   d_model: 768
-  n_audio_layers: 2
-  n_fusion_layers: 2
+  n_vl_layers: 3
+  n_fusion_layers: 1
   d_state: 16
   conv_kernel: 4
   expand: 2
