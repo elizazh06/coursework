@@ -1,3 +1,6 @@
+import math
+
+
 class MetricTracker:
 
     def __init__(self, *keys, writer=None):
@@ -10,21 +13,32 @@ class MetricTracker:
         self._counts = {k: 0 for k in self._keys}
 
     def update(self, key, value):
+        value = float(value)
+        if not math.isfinite(value):
+            return
         if key not in self._totals:
             self._totals[key] = 0.0
             self._counts[key] = 0
             self._keys.append(key)
-        self._totals[key] += float(value)
+        self._totals[key] += value
         self._counts[key] += 1
 
     def avg(self, key):
         count = self._counts.get(key, 0)
         if count == 0:
-            return 0.0
-        return self._totals[key] / count
+            return None
+        avg = self._totals[key] / count
+        return avg if math.isfinite(avg) else None
 
     def result(self):
-        return {k: self.avg(k) for k in self._keys}
+        out = {}
+        for k in self._keys:
+            if self._counts.get(k, 0) <= 0:
+                continue
+            avg = self.avg(k)
+            if avg is not None:
+                out[k] = avg
+        return out
 
     def keys(self):
         return self._keys

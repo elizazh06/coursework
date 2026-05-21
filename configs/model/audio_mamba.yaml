@@ -1,3 +1,8 @@
+# Train:
+#   python train.py --config configs/train.yaml dataset=ref_avs model=audio_mamba writer.run_name=audio_mamba dataset.params.data_root=REFAVS
+# Inference:
+#   python inference.py --config configs/inference.yaml dataset=ref_avs model=audio_mamba inferencer.from_pretrained=checkpoints/audio_mamba/model_best.pth dataset.params.data_root=REFAVS
+
 model:
   _target_: models.audio_mamba.AudioMambaModel
 

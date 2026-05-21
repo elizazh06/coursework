@@ -50,8 +50,10 @@ class BaseTrainer:
                 self.early_stop = inf
         self.writer = writer
         self.metrics = metrics
+        val_metric_funcs = self.metrics.get('val', self.metrics['inference'])
         self.train_metrics = MetricTracker(*self.config.writer.loss_names, 'grad_norm', *[m.name for m in self.metrics['train']], writer=self.writer)
-        self.evaluation_metrics = MetricTracker(*self.config.writer.loss_names, *[m.name for m in self.metrics['inference']], writer=self.writer)
+        self.evaluation_metrics = MetricTracker(*self.config.writer.loss_names, *[m.name for m in val_metric_funcs], writer=self.writer)
+        self._epoch_log_keys = list(self.cfg_trainer.get('log_keys', []))
         self.checkpoint_dir = ROOT_PATH / config.trainer.save_dir / config.writer.run_name
         if config.trainer.get('resume_from') is not None:
             resume_path = self.checkpoint_dir / config.trainer.resume_from
@@ -74,7 +76,7 @@ class BaseTrainer:
             result = self._train_epoch(epoch)
             logs = {'epoch': epoch}
             logs.update(result)
-            for (key, value) in logs.items():
+            for (key, value) in self._select_epoch_logs(logs).items():
                 self.logger.info(f'    {key:15s}: {value}')
             (best, stop_process, not_improved_count) = self._monitor_performance(logs, not_improved_count)
             if best:
@@ -110,10 +112,9 @@ class BaseTrainer:
                 self._log_scalars(self.train_metrics)
                 self._log_batch(batch_idx, batch)
                 last_train_metrics = self.train_metrics.result()
-                self.train_metrics.reset()
             if batch_idx + 1 >= self.epoch_len:
                 break
-        logs = last_train_metrics
+        logs = self.train_metrics.result() or last_train_metrics
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
         eval_every = int(self.cfg_trainer.get('eval_every', 1))
@@ -201,6 +202,30 @@ class BaseTrainer:
         total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type) for p in parameters]), norm_type)
         return total_norm.item()
 
+    def _select_epoch_logs(self, logs):
+        if self._epoch_log_keys:
+            selected = {}
+            if 'epoch' in logs:
+                selected['epoch'] = logs['epoch']
+            for key in self._epoch_log_keys:
+                if key in logs:
+                    value = logs[key]
+                    if value is not None and (not isinstance(value, (int, float)) or value == value):
+                        selected[key] = value
+            if len(selected) > 1 or (len(selected) == 1 and 'epoch' not in selected):
+                return selected
+        selected = {}
+        for (key, value) in logs.items():
+            if key == 'epoch':
+                selected[key] = value
+                continue
+            if value is None:
+                continue
+            if isinstance(value, (int, float)) and value != value:
+                continue
+            selected[key] = value
+        return selected
+
     def _progress(self, batch_idx):
         base = '[{}/{} ({:.0f}%)]'
         if hasattr(self.train_dataloader, 'n_samples'):
@@ -219,7 +244,9 @@ class BaseTrainer:
         if self.writer is None:
             return
         for metric_name in metric_tracker.keys():
-            self.writer.add_scalar(f'{metric_name}', metric_tracker.avg(metric_name))
+            value = metric_tracker.avg(metric_name)
+            if value is not None:
+                self.writer.add_scalar(f'{metric_name}', value)
 
     def _save_checkpoint(self, epoch, save_best=False, only_best=False):
         arch = type(self.model).__name__

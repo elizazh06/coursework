@@ -40,6 +40,11 @@ trainer:
   use_amp: true
   amp_dtype: fp16
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
+  log_keys:
+    - loss
+    - mean_iou
+    - val_loss
+    - val_mean_iou
 
 inferencer:
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
@@ -54,6 +59,9 @@ loss_function:
 
 metrics:
   train:
+    - _target_: metrics.segmentation_metrics.MeanIoUMetric
+      name: mean_iou
+  val:
     - _target_: metrics.segmentation_metrics.MeanIoUMetric
       name: mean_iou
   inference:
@@ -76,4 +84,4 @@ lr_scheduler:
 
 writer:
   run_name: ref_avs_train
-  loss_names: ["loss", "bce_loss", "dice_loss"]
+  loss_names: ["loss"]
