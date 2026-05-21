@@ -1,0 +1,28 @@
+# Paper:
+#   https://openaccess.thecvf.com/content_ECCV_2018/html/Yapeng_Tian_Audio-Visual_Event_Localization_ECCV_2018_paper.html
+# Code:
+#   https://github.com/YapengTian/AVE-ECCV18
+# Train:
+#   python train.py --config configs/train.yaml dataset=ref_avs model=avel_lstm_avs writer.run_name=avel_lstm_avs dataset.params.data_root=REFAVS
+# Inference:
+#   python inference.py --config configs/inference.yaml dataset=ref_avs model=avel_lstm_avs inferencer.from_pretrained=checkpoints/avel_lstm_avs/model_best.pth dataset.params.data_root=REFAVS
+
+model:
+  _target_: models.avel_lstm_avs.AVELLSTMAVSModel
+
+  d_model: 512
+  lstm_hidden: 256
+  n_lstm_layers: 2
+  dropout: 0.1
+
+  audio_dim: 128
+  text_dim: 768
+  max_audio_tokens: 10
+  max_text_tokens: 25
+
+  mask_size: 256
+  image_size: 256
+
+  pretrained_visual_model: facebook/mask2former-swin-base-ade-semantic
+  freeze_visual_backbone: true
+  freeze_audio_adapter: false
