@@ -1,30 +1,20 @@
-# ===== Core PyTorch stack =====
 torch==2.2.2
 torchvision==0.17.2
 torchaudio==2.2.2
 
-# ===== Utilities =====
-PyYAML>=6.0
-tqdm>=4.66.0
-numpy>=1.24.0,<2.0.0
+numpy==1.26.4
+opencv-python==4.8.1.78
+pandas==2.1.4
 
-# ===== Data / Image processing =====
-pandas>=2.0.0,<2.2.0
-
-# opencv-python pulls NumPy 2.x on many systems and often breaks old HPC stacks
-# install only if really needed
-# opencv-python==4.10.0.84
-
-Pillow>=10.0.0
-
-# ===== HuggingFace stack =====
 transformers==4.38.2
-safetensors>=0.4.0
-huggingface-hub>=0.20.0
-tokenizers>=0.15.0,<0.19
-
-# ===== Mamba =====
 mamba-ssm==1.2.0
+
 einops>=0.7.0
 ninja>=1.11.0
+PyYAML>=6.0
+tqdm>=4.66.0
+Pillow>=10.0.0
+safetensors>=0.4.0
+huggingface-hub>=0.20.0
+tokenizers>=0.15.0
 packaging>=23.0
