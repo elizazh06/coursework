@@ -1,2 +1,25 @@
 venv/
 .vscode/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Environments
+venv/
+.env
+.conda/
+
+# PyTorch
+checkpoints/
+runs/
+
+# Slurm
+*.out
+*.err
+
+# VSCode
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
