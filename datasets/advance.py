@@ -16,6 +16,14 @@ except ImportError:
 IMAGE_EXTS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
 AUDIO_EXTS = {'.wav', '.flac', '.mp3', '.ogg', '.m4a'}
 
+def _torch_load_compat(path, map_location='cpu', weights_only=None):
+    try:
+        if weights_only is None:
+            return torch.load(path, map_location=map_location)
+        return torch.load(path, map_location=map_location, weights_only=weights_only)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+
 def _collect_files(root: Path, exts: set) -> Dict[str, Dict[str, Path]]:
     by_class = {}
     if not root.exists():
@@ -190,7 +198,7 @@ class ADVANCEDataset(BaseDataset):
     def __getitem__(self, ind):
         e = self._index[ind]
         if e.get('cached', False):
-            item = torch.load(e['path'], map_location='cpu', weights_only=False)
+            item = _torch_load_compat(e['path'], map_location='cpu', weights_only=False)
             video = item['video']
             audio = item['audio']
             label = item['label'].long()

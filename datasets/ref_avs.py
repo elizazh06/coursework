@@ -21,6 +21,14 @@ except ImportError:
     _TORCHAUDIO_AVAILABLE = False
 _SPLIT_MAP = {'train': 'train', 'val': 'val', 'test': 'test_s', 'test_s': 'test_s', 'test_u': 'test_u', 'test_n': 'test_n'}
 
+def _torch_load_compat(path, map_location='cpu', weights_only=None):
+    try:
+        if weights_only is None:
+            return torch.load(path, map_location=map_location)
+        return torch.load(path, map_location=map_location, weights_only=weights_only)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+
 class RefAVSDataset(BaseDataset):
 
     def __init__(self, data_root: str, split: str='train', frame_n: int=10, mask_size: int=256, image_size: int=256, sample_rate: int=16000, text_model: str='distilbert/distilroberta-base', text_max_len: int=25, use_cache: bool=True, cache_root: Optional[str]=None, rebuild_cache: bool=False, limit: Optional[int]=None, shuffle_index: bool=False, instance_transforms=None, **_):
@@ -173,7 +181,7 @@ class RefAVSDataset(BaseDataset):
         frames = self._load_frames(entry['path'])
         masks = self._load_masks(entry['mask_dir'])
         if self.use_cache and entry.get('cache_path'):
-            cached = torch.load(entry['cache_path'], map_location='cpu', weights_only=True)
+            cached = _torch_load_compat(entry['cache_path'], map_location='cpu', weights_only=True)
             audio_feat = cached['audio_feat']
             text_feat = cached['text_feat']
         else:

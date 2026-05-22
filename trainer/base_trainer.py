@@ -8,6 +8,17 @@ from datasets.data_utils import inf_loop
 from metrics.tracker import MetricTracker
 from utils.io_utils import ROOT_PATH, resolve_path
 
+def _torch_load_compat(path, map_location=None, weights_only=None):
+    kwargs = {}
+    if map_location is not None:
+        kwargs['map_location'] = map_location
+    try:
+        if weights_only is None:
+            return torch.load(path, **kwargs)
+        return torch.load(path, weights_only=weights_only, **kwargs)
+    except TypeError:
+        return torch.load(path, **kwargs)
+
 class BaseTrainer:
 
     def __init__(self, model, criterion, metrics, optimizer, lr_scheduler, config, device, dataloaders, logger, writer, epoch_len=None, skip_oom=True, batch_transforms=None):
@@ -303,7 +314,4 @@ class BaseTrainer:
 
     def _load_checkpoint_file(self, checkpoint_path):
         path = resolve_path(checkpoint_path, must_exist=True)
-        try:
-            return torch.load(path, map_location=self.device, weights_only=False)
-        except TypeError:
-            return torch.load(path, map_location=self.device)
+        return _torch_load_compat(path, map_location=self.device, weights_only=False)

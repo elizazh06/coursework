@@ -5,6 +5,17 @@ import torch
 from torch.utils.data import Dataset
 logger = logging.getLogger(__name__)
 
+def _torch_load_compat(path, map_location=None, weights_only=None):
+    kwargs = {}
+    if map_location is not None:
+        kwargs['map_location'] = map_location
+    try:
+        if weights_only is None:
+            return torch.load(path, **kwargs)
+        return torch.load(path, weights_only=weights_only, **kwargs)
+    except TypeError:
+        return torch.load(path, **kwargs)
+
 class BaseDataset(Dataset):
 
     def __init__(self, index, limit=None, shuffle_index=False, instance_transforms=None):
@@ -26,7 +37,7 @@ class BaseDataset(Dataset):
         return len(self._index)
 
     def load_object(self, path):
-        data_object = torch.load(path, weights_only=False)
+        data_object = _torch_load_compat(path, weights_only=False)
         return data_object
 
     def preprocess_data(self, instance_data):
