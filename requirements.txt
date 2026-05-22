@@ -4,9 +4,9 @@ torchaudio>=2.1.0
 
 PyYAML>=6.0
 tqdm>=4.66.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 
-pandas>=2.0.0
+pandas>=2.0.0,<2.2.0
 opencv-python>=4.8.0
 Pillow>=10.0.0
 
