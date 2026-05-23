@@ -10,8 +10,8 @@
 dataset:
   module: ref_avs
   name: RefAVSDataset
-  batch_size: 64
-  eval_batch_size: 64
+  batch_size: 16
+  eval_batch_size: 16
   num_workers: 8
   prefetch_factor: 4
   persistent_workers: true
