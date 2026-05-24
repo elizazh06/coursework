@@ -1,5 +1,6 @@
 from __future__ import annotations
 import torch
+from utils.segmentation_utils import flatten_logits_and_masks
 
 def _threshold_masks(logits: torch.Tensor, threshold: float=0.5) -> torch.Tensor:
     return (torch.sigmoid(logits) >= threshold).bool()
@@ -11,12 +12,7 @@ class MeanIoUMetric:
         self.threshold = float(threshold)
 
     def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
-        if logits.dim() == 4:
-            (b, t, h, w) = logits.shape
-            logits = logits.view(b * t, h, w)
-        if masks.dim() == 4:
-            (b, t, hm, wm) = masks.shape
-            masks = masks.view(b * t, hm, wm)
+        logits, masks = flatten_logits_and_masks(logits, masks)
         pred = _threshold_masks(logits, self.threshold)
         gt = masks.bool().to(pred.device)
         if pred.shape[-2:] != gt.shape[-2:]:
@@ -43,12 +39,7 @@ class BoundaryFMetric:
         self.threshold = float(threshold)
 
     def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
-        if logits.dim() == 4:
-            (b, t, h, w) = logits.shape
-            logits = logits.view(b * t, h, w)
-        if masks.dim() == 4:
-            (b, t, hm, wm) = masks.shape
-            masks = masks.view(b * t, hm, wm)
+        logits, masks = flatten_logits_and_masks(logits, masks)
         pred = _threshold_masks(logits, self.threshold)
         gt = masks.bool().to(pred.device)
         if pred.shape[-2:] != gt.shape[-2:]:

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils.segmentation_utils import flatten_logits_and_masks
 
 def _dice_loss(probs: torch.Tensor, targets: torch.Tensor, eps: float=1.0) -> torch.Tensor:
     probs = probs.flatten(1)
@@ -19,9 +20,7 @@ class SegmentationLoss(nn.Module):
         self.register_buffer('pos_weight', pw)
 
     def forward(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> dict:
-        if masks.dim() == 4:
-            (b, t, hm, wm) = masks.shape
-            masks = masks.view(b * t, hm, wm)
+        logits, masks = flatten_logits_and_masks(logits, masks)
         targets = masks.float()
         if logits.shape[-2:] != targets.shape[-2:]:
             targets = F.interpolate(targets.unsqueeze(1), size=logits.shape[-2:], mode='nearest').squeeze(1)

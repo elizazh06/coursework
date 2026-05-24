@@ -2,6 +2,7 @@ import torch
 from tqdm.auto import tqdm
 from metrics.tracker import MetricTracker
 from trainer.base_trainer import BaseTrainer
+from utils.segmentation_utils import align_logits_to_masks
 
 class Inferencer(BaseTrainer):
 
@@ -33,6 +34,13 @@ class Inferencer(BaseTrainer):
             part_logs[part] = logs
         return part_logs
 
+    def _prepare_batch_for_metrics(self, batch):
+        masks = batch.get('masks')
+        logits = batch.get('logits')
+        if masks is not None and logits is not None and logits.dim() >= 3:
+            batch['logits'] = align_logits_to_masks(logits, masks)
+        return batch
+
     def process_batch(self, batch_idx, batch, metrics, part):
         batch = self.move_batch_to_device(batch)
         batch = self.transform_batch(batch)
@@ -41,21 +49,34 @@ class Inferencer(BaseTrainer):
             batch.update(outputs)
         else:
             batch['logits'] = outputs
+        batch = self._prepare_batch_for_metrics(batch)
         if metrics is not None:
             for met in self.metrics['inference']:
                 metrics.update(met.name, met(**batch))
-        batch_size = batch['logits'].shape[0]
+        if self.save_predictions and self.save_path is not None:
+            self._save_batch_predictions(batch_idx, batch, part)
+        return batch
+
+    def _save_batch_predictions(self, batch_idx, batch, part):
+        logits = batch['logits']
+        masks = batch.get('masks')
+        label_tensor = batch.get('labels', batch.get('label'))
+        if masks is not None:
+            batch_size = masks.shape[0]
+        else:
+            batch_size = logits.shape[0]
         current_id = batch_idx * batch_size
         for i in range(batch_size):
-            logits = batch['logits'][i].clone()
-            label_tensor = batch.get('labels', batch.get('label'))
-            label = label_tensor[i].clone()
-            pred_label = logits.argmax(dim=-1)
+            sample_logits = logits[i].clone()
+            if masks is not None:
+                label = masks[i].clone()
+                pred_label = torch.sigmoid(sample_logits) >= 0.5
+            else:
+                label = label_tensor[i].clone()
+                pred_label = sample_logits.argmax(dim=-1)
             output_id = current_id + i
             output = {'pred_label': pred_label, 'label': label}
-            if self.save_predictions and self.save_path is not None:
-                torch.save(output, self.save_path / part / f'output_{output_id}.pth')
-        return batch
+            torch.save(output, self.save_path / part / f'output_{output_id}.pth')
 
     def _inference_part(self, part, dataloader):
         self.is_train = False

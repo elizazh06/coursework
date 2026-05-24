@@ -214,7 +214,7 @@ class BaseAVSceneModel(nn.Module, MambaPretrainedMixin):
         logits = []
         for idx in range(queries.size(1)):
             logits.append(self.decoder(queries[:, idx], spatial[:, idx]))
-        return torch.cat(logits, dim=0)
+        return torch.stack(logits, dim=1)
 
 class MoEFeedForward(nn.Module):
 
