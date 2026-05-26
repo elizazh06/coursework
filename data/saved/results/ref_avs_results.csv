@@ -1,0 +1,7 @@
+timestamp_utc,dataset,model,checkpoint,save_path,test_boundary_f,test_j_and_f,test_mean_iou
+2026-05-24T15:41:55,ref_avs,models.ref_avs_baseline.RefAVSBaselineModel,checkpoints/ref_avs_baseline/model_best.pth,/home/elvlzhukova/coursework/data/saved/ref_avs_inference,0.040243182677145314,0.16205737143591892,0.2838715601946924
+2026-05-24T15:41:58,ref_avs,models.avs_mamba.AVSMambaModel,checkpoints/avs_mamba/model_best.pth,/home/elvlzhukova/coursework/data/saved/ref_avs_inference,0.0,0.0,0.0
+2026-05-24T15:42:37,ref_avs,models.mamba_vl.MambaVLModel,checkpoints/mamba_vl/model_best.pth,/home/elvlzhukova/coursework/data/saved/ref_avs_inference,0.0,0.0,0.0
+2026-05-24T15:42:54,ref_avs,models.video_audio_mamba.VideoAudioMambaModel,checkpoints/video_audio_mamba/model_best.pth,/home/elvlzhukova/coursework/data/saved/ref_avs_inference,0.008965438551777161,0.028346631682884784,0.04772782481399241
+2026-05-24T15:47:31,ref_avs,models.mixture_of_mamba.MixtureOfMambaModel,checkpoints/mixture_of_mamba/model_best.pth,/home/elvlzhukova/coursework/data/saved/ref_avs_inference,0.0011164945819626,0.0032637437155322614,0.0054109928491019215
+2026-05-24T15:47:32,ref_avs,models.avel_lstm.AVELLSTMModel,checkpoints/avel_lstm/model_best.pth,/home/elvlzhukova/coursework/data/saved/ref_avs_inference,0.001341066591494954,0.004403265629760147,0.007465464668025338

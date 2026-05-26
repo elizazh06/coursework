@@ -33,12 +33,12 @@ class MambaVLModel(BaseAVSceneModel):
         del masks
         spatial, video_tokens, audio_tokens, text_tokens = self._project_inputs(frames, audio_feat, text_feat)
         b, t = video_tokens.shape[:2]
-        vl = torch.cat([video_tokens + self.modality_embed[:, 0:1], text_tokens + self.modality_embed[:, 2:3]], dim=1)
+        vl = torch.cat([text_tokens + self.modality_embed[:, 2:3], video_tokens + self.modality_embed[:, 0:1]], dim=1)
         vl = self.dropout(vl + self.vl_pos_embed[:, :vl.size(1)])
         for block in self.vl_blocks:
             vl = block(vl)
         vl = self.vl_blocks_norm(vl)
-        video_text_tokens = vl[:, :t]
+        video_text_tokens = vl[:, text_tokens.size(1):text_tokens.size(1) + t]
         queries = self.query_embed.expand(b, t, -1)
         fusion = torch.cat([video_text_tokens + self.modality_embed[:, 0:1], audio_tokens + self.modality_embed[:, 1:2], queries + self.modality_embed[:, 3:4]], dim=1)
         fusion = self.dropout(fusion + self.fusion_pos_embed[:, :fusion.size(1)])
