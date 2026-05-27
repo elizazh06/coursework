@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -85,6 +86,9 @@ class MambaSequenceBlock(nn.Module):
 
 class MambaPretrainedMixin:
 
+    def _log_pretrained_mamba(self, message, level=logging.INFO):
+        logging.getLogger('coursework').log(level, message)
+
     def _load_pretrained_mamba_from_hf(self, hf_model_name, containers):
         try:
             from transformers import AutoModelForCausalLM
@@ -93,32 +97,48 @@ class MambaPretrainedMixin:
         try:
             src_state = AutoModelForCausalLM.from_pretrained(hf_model_name, trust_remote_code=True).state_dict()
         except Exception as e:
-            print(f'[{type(self).__name__}] HF Mamba load failed ({e}); continuing with random Mamba init.')
+            self._log_pretrained_mamba(f'[{type(self).__name__}] HF Mamba load failed ({e}); continuing with random Mamba init.', logging.WARNING)
             return
         dst_state = self.state_dict()
         mapped = {}
         src_layer_idx = 0
+        source_prefixes = ('backbone.layers', 'model.layers', 'layers')
         for container_name in containers:
             container = getattr(self, container_name, None)
             if container is None:
                 continue
             for dst_layer_idx in range(len(container)):
-                src_prefix = f'backbone.layers.{src_layer_idx}.mixer.'
                 dst_prefix = f'{container_name}.{dst_layer_idx}.mixer.mamba.'
-                layer_has_any = False
-                for src_key, value in src_state.items():
-                    if not src_key.startswith(src_prefix):
-                        continue
-                    layer_has_any = True
-                    dst_key = dst_prefix + src_key[len(src_prefix):]
-                    if dst_key in dst_state and dst_state[dst_key].shape == value.shape:
-                        mapped[dst_key] = value
+                layer_mapped = 0
+                for prefix_root in source_prefixes:
+                    src_prefix = f'{prefix_root}.{src_layer_idx}.mixer.'
+                    layer_has_any = False
+                    for src_key, value in src_state.items():
+                        if not src_key.startswith(src_prefix):
+                            continue
+                        layer_has_any = True
+                        dst_key = dst_prefix + src_key[len(src_prefix):]
+                        if dst_key in dst_state and dst_state[dst_key].shape == value.shape:
+                            mapped[dst_key] = value.to(dtype=dst_state[dst_key].dtype)
+                            layer_mapped += 1
+                    if layer_has_any:
+                        break
                 if not layer_has_any:
                     break
+                if layer_mapped == 0:
+                    self._log_pretrained_mamba(
+                        f'[{type(self).__name__}] HF Mamba layer {src_layer_idx} had keys but none matched {container_name}.{dst_layer_idx}.',
+                        logging.WARNING,
+                    )
                 src_layer_idx += 1
         if mapped:
             self.load_state_dict(mapped, strict=False)
-            print(f'[{type(self).__name__}] Loaded {len(mapped)} tensors from HF Mamba: {hf_model_name}')
+            self._log_pretrained_mamba(f'[{type(self).__name__}] Loaded {len(mapped)} tensors from HF Mamba: {hf_model_name}')
+        else:
+            self._log_pretrained_mamba(
+                f'[{type(self).__name__}] No tensors matched HF Mamba checkpoint {hf_model_name}; Mamba blocks stay randomly initialized.',
+                logging.WARNING,
+            )
 
     def _load_pretrained_mamba_checkpoint(self, pretrained_path, prefix='', allowed_prefixes=()):
         ckpt = torch.load(pretrained_path, map_location='cpu')
@@ -132,7 +152,12 @@ class MambaPretrainedMixin:
         to_load = {k: v for k, v in src_state.items() if (not allowed_prefixes or k.startswith(allowed_prefixes)) and k in dst_state and dst_state[k].shape == v.shape}
         if to_load:
             self.load_state_dict(to_load, strict=False)
-            print(f'[{type(self).__name__}] Loaded {len(to_load)} tensors from {pretrained_path}')
+            self._log_pretrained_mamba(f'[{type(self).__name__}] Loaded {len(to_load)} tensors from {pretrained_path}')
+        else:
+            self._log_pretrained_mamba(
+                f'[{type(self).__name__}] No tensors matched Mamba checkpoint {pretrained_path}; Mamba blocks stay unchanged.',
+                logging.WARNING,
+            )
 
 class Mask2FormerFrameEncoder(nn.Module):
 
@@ -254,7 +279,7 @@ class MixtureOfMambaBlock(nn.Module):
 
 class MixtureOfMambaModel(BaseAVSceneModel):
 
-    def __init__(self, d_model=768, hidden_dim=None, n_layers=4, d_state=16, conv_kernel=4, expand=2, ff_mult=4, num_experts=4, top_k=2, dropout=0.1, audio_dim=128, text_dim=768, max_audio_tokens=10, max_text_tokens=25, mask_size=256, image_size=256, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True, use_official_mamba_ssm=True, hf_pretrained_mamba_model='state-spaces/mamba-130m-hf', auto_load_pretrained_mamba=False, pretrained_mamba_path=None, pretrained_mamba_prefix='', freeze_mamba=False, **_):
+    def __init__(self, d_model=768, hidden_dim=None, n_layers=4, d_state=16, conv_kernel=4, expand=2, ff_mult=4, num_experts=4, top_k=2, dropout=0.1, audio_dim=128, text_dim=768, max_audio_tokens=10, max_text_tokens=25, mask_size=256, image_size=256, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True, use_official_mamba_ssm=True, hf_pretrained_mamba_model='state-spaces/mamba-130m-hf', load_pretrained_mamba=True, pretrained_mamba_path=None, pretrained_mamba_prefix='', freeze_mamba=False, **_):
         if hidden_dim is not None:
             d_model = int(hidden_dim)
         super().__init__(d_model=d_model, audio_dim=audio_dim, text_dim=text_dim, max_audio_tokens=max_audio_tokens, max_text_tokens=max_text_tokens, mask_size=mask_size, pretrained_visual_model=pretrained_visual_model, freeze_visual_backbone=freeze_visual_backbone, dropout=dropout)
@@ -266,7 +291,7 @@ class MixtureOfMambaModel(BaseAVSceneModel):
         nn.init.trunc_normal_(self.modality_embed, std=0.02)
         nn.init.trunc_normal_(self.mask_query, std=0.02)
         nn.init.trunc_normal_(self.pos_embed, std=0.02)
-        if hf_pretrained_mamba_model:
+        if load_pretrained_mamba and hf_pretrained_mamba_model:
             self._load_pretrained_mamba_from_hf(hf_pretrained_mamba_model, ('blocks',))
         if pretrained_mamba_path:
             self._load_pretrained_mamba_checkpoint(pretrained_mamba_path, pretrained_mamba_prefix, ('blocks.', 'blocks_norm.'))

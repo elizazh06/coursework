@@ -10,8 +10,10 @@
 dataset:
   module: ref_avs
   name: RefAVSDataset
-  batch_size: 16
-  eval_batch_size: 16
+  # Full-training defaults. For a quick smoke/tiny-overfit run, override these
+  # from CLI instead of editing the file, e.g. dataset.params.limit=4.
+  batch_size: 8
+  eval_batch_size: 8
   num_workers: 8
   prefetch_factor: 4
   persistent_workers: true
@@ -28,12 +30,15 @@ dataset:
     use_cache: true
     cache_root: null
     rebuild_cache: false
+    limit: null
+    shuffle_index: false
 
 trainer:
-  n_epochs: 30
+  n_epochs: 80
   monitor: "max val_mean_iou"
-  early_stop: 8
-  log_step: 20
+  monitor_min_delta: 1.0e-5
+  early_stop: 12
+  log_step: 50
   eval_every: 2
   eval_parts: ["val"]
   grad_norm_every: 100
@@ -42,9 +47,23 @@ trainer:
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
   log_keys:
     - loss
+    - bce_loss
+    - dice_loss
     - mean_iou
+    - soft_mean_iou
+    - pred_pos_rate
+    - target_pos_rate
+    - logit_mean
+    - logit_std
     - val_loss
+    - val_bce_loss
+    - val_dice_loss
     - val_mean_iou
+    - val_soft_mean_iou
+    - val_pred_pos_rate
+    - val_target_pos_rate
+    - val_logit_mean
+    - val_logit_std
 
 inferencer:
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
@@ -63,9 +82,29 @@ metrics:
   train:
     - _target_: metrics.segmentation_metrics.MeanIoUMetric
       name: mean_iou
+    - _target_: metrics.segmentation_metrics.SoftMeanIoUMetric
+      name: soft_mean_iou
+    - _target_: metrics.segmentation_metrics.PredPositiveRateMetric
+      name: pred_pos_rate
+    - _target_: metrics.segmentation_metrics.TargetPositiveRateMetric
+      name: target_pos_rate
+    - _target_: metrics.segmentation_metrics.LogitMeanMetric
+      name: logit_mean
+    - _target_: metrics.segmentation_metrics.LogitStdMetric
+      name: logit_std
   val:
     - _target_: metrics.segmentation_metrics.MeanIoUMetric
       name: mean_iou
+    - _target_: metrics.segmentation_metrics.SoftMeanIoUMetric
+      name: soft_mean_iou
+    - _target_: metrics.segmentation_metrics.PredPositiveRateMetric
+      name: pred_pos_rate
+    - _target_: metrics.segmentation_metrics.TargetPositiveRateMetric
+      name: target_pos_rate
+    - _target_: metrics.segmentation_metrics.LogitMeanMetric
+      name: logit_mean
+    - _target_: metrics.segmentation_metrics.LogitStdMetric
+      name: logit_std
   inference:
     - _target_: metrics.segmentation_metrics.MeanIoUMetric
       name: mean_iou
@@ -80,10 +119,12 @@ optimizer:
   weight_decay: 1.0e-4
 
 lr_scheduler:
-  _target_: torch.optim.lr_scheduler.CosineAnnealingLR
-  T_max: 30
-  eta_min: 1.0e-6
+  _target_: utils.lr_scheduler.WarmupCosineLR
+  max_epochs: 80
+  warmup_epochs: 5
+  min_lr: 1.0e-6
+  warmup_start_factor: 0.2
 
 writer:
   run_name: ref_avs_train
-  loss_names: ["loss"]
+  loss_names: ["loss", "bce_loss", "dice_loss"]

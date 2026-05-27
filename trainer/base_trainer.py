@@ -1,5 +1,6 @@
 from abc import abstractmethod
 import inspect
+import math
 import torch
 from numpy import inf
 from torch.nn.utils import clip_grad_norm_
@@ -57,13 +58,20 @@ class BaseTrainer:
             assert self.mnt_mode in ['min', 'max']
             self.mnt_best = inf if self.mnt_mode == 'min' else -inf
             self.early_stop = self.cfg_trainer.get('early_stop', inf)
+            self.monitor_min_delta = float(self.cfg_trainer.get('monitor_min_delta', 0.0))
             if self.early_stop <= 0:
                 self.early_stop = inf
         self.writer = writer
         self.metrics = metrics
         val_metric_funcs = self.metrics.get('val', self.metrics['inference'])
-        self.train_metrics = MetricTracker(*self.config.writer.loss_names, 'grad_norm', *[m.name for m in self.metrics['train']], writer=self.writer)
-        self.evaluation_metrics = MetricTracker(*self.config.writer.loss_names, *[m.name for m in val_metric_funcs], writer=self.writer)
+        loss_names = list(self.config.writer.loss_names)
+        if 'loss' not in loss_names:
+            loss_names.insert(0, 'loss')
+            self.config.writer.loss_names = loss_names
+            self.writer.loss_names = loss_names
+            self.logger.warning("writer.loss_names did not include 'loss'; adding it for training logs.")
+        self.train_metrics = MetricTracker(*loss_names, 'grad_norm', *[m.name for m in self.metrics['train']], writer=self.writer)
+        self.evaluation_metrics = MetricTracker(*loss_names, *[m.name for m in val_metric_funcs], writer=self.writer)
         self._epoch_log_keys = list(self.cfg_trainer.get('log_keys', []))
         self.checkpoint_dir = ROOT_PATH / config.trainer.save_dir / config.writer.run_name
         if config.trainer.get('resume_from') is not None:
@@ -159,19 +167,27 @@ class BaseTrainer:
         stop_process = False
         if self.mnt_mode != 'off':
             try:
+                current = logs[self.mnt_metric]
+                if not isinstance(current, (int, float)) or not math.isfinite(current):
+                    raise ValueError(f"Metric '{self.mnt_metric}' is not finite: {current}")
                 if self.mnt_mode == 'min':
-                    improved = logs[self.mnt_metric] < self.mnt_best
+                    improved = current < self.mnt_best - self.monitor_min_delta
                 elif self.mnt_mode == 'max':
-                    improved = logs[self.mnt_metric] > self.mnt_best
+                    improved = current > self.mnt_best + self.monitor_min_delta
                 else:
                     improved = False
             except KeyError:
                 self.logger.warning(f"Warning: Metric '{self.mnt_metric}' is not found. Skipping performance monitoring for this epoch.")
                 return (best, stop_process, not_improved_count)
+            except ValueError as exc:
+                self.logger.warning(f'{exc}. Skipping performance monitoring for this epoch.')
+                return (best, stop_process, not_improved_count)
             if improved:
-                self.mnt_best = logs[self.mnt_metric]
+                previous_best = self.mnt_best
+                self.mnt_best = current
                 not_improved_count = 0
                 best = True
+                self.logger.info(f"Monitor improved: {self.mnt_metric} {previous_best} -> {self.mnt_best}")
             else:
                 not_improved_count += 1
             if not_improved_count >= self.early_stop:
@@ -210,6 +226,8 @@ class BaseTrainer:
         if isinstance(parameters, torch.Tensor):
             parameters = [parameters]
         parameters = [p for p in parameters if p.grad is not None]
+        if not parameters:
+            return 0.0
         total_norm = torch.norm(torch.stack([torch.norm(p.grad.detach(), norm_type) for p in parameters]), norm_type)
         return total_norm.item()
 

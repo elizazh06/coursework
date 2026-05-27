@@ -24,6 +24,60 @@ class MeanIoUMetric:
         return iou.mean().item()
 JMetric = MeanIoUMetric
 
+class SoftMeanIoUMetric:
+
+    def __init__(self, name: str='soft_mean_iou'):
+        self.name = name
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        logits, masks = flatten_logits_and_masks(logits, masks)
+        probs = torch.sigmoid(logits)
+        gt = masks.float().to(probs.device)
+        if probs.shape[-2:] != gt.shape[-2:]:
+            import torch.nn.functional as F
+            gt = F.interpolate(gt.unsqueeze(1), size=probs.shape[-2:], mode='nearest').squeeze(1)
+        intersection = (probs * gt).flatten(1).sum(dim=1)
+        union = (probs + gt - probs * gt).flatten(1).sum(dim=1)
+        iou = intersection / (union + 1e-06)
+        return iou.mean().item()
+
+class PredPositiveRateMetric:
+
+    def __init__(self, name: str='pred_pos_rate', threshold: float=0.5):
+        self.name = name
+        self.threshold = float(threshold)
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        del masks
+        return _threshold_masks(logits, self.threshold).float().mean().item()
+
+class TargetPositiveRateMetric:
+
+    def __init__(self, name: str='target_pos_rate'):
+        self.name = name
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        del logits
+        return masks.float().mean().item()
+
+class LogitMeanMetric:
+
+    def __init__(self, name: str='logit_mean'):
+        self.name = name
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        del masks
+        return logits.detach().float().mean().item()
+
+class LogitStdMetric:
+
+    def __init__(self, name: str='logit_std'):
+        self.name = name
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        del masks
+        return logits.detach().float().std(unbiased=False).item()
+
 def _dilate(mask: torch.Tensor, kernel: int=3) -> torch.Tensor:
     pad = kernel // 2
     return torch.nn.functional.max_pool2d(mask.float().unsqueeze(0), kernel_size=kernel, stride=1, padding=pad).squeeze(0).bool()

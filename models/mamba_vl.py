@@ -6,7 +6,7 @@ from models.mixture_of_mamba import BaseAVSceneModel, MambaSequenceBlock, RMSNor
 
 class MambaVLModel(BaseAVSceneModel):
 
-    def __init__(self, d_model=768, n_vl_layers=3, n_fusion_layers=1, d_state=16, conv_kernel=4, expand=2, ff_mult=4, dropout=0.1, max_audio_tokens=10, max_text_tokens=25, mask_size=256, image_size=256, audio_dim=128, text_dim=768, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True, use_official_mamba_ssm=True, hf_pretrained_mamba_model='state-spaces/mamba-130m-hf', pretrained_mamba_path=None, pretrained_mamba_prefix='', freeze_mamba=False, **_):
+    def __init__(self, d_model=768, n_vl_layers=3, n_fusion_layers=1, d_state=16, conv_kernel=4, expand=2, ff_mult=4, dropout=0.1, max_audio_tokens=10, max_text_tokens=25, mask_size=256, image_size=256, audio_dim=128, text_dim=768, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True, use_official_mamba_ssm=True, hf_pretrained_mamba_model='state-spaces/mamba-130m-hf', load_pretrained_mamba=True, pretrained_mamba_path=None, pretrained_mamba_prefix='', freeze_mamba=False, **_):
         super().__init__(d_model=d_model, audio_dim=audio_dim, text_dim=text_dim, max_audio_tokens=max_audio_tokens, max_text_tokens=max_text_tokens, mask_size=mask_size, pretrained_visual_model=pretrained_visual_model, freeze_visual_backbone=freeze_visual_backbone, dropout=dropout)
         self.vl_blocks = nn.ModuleList([MambaSequenceBlock(d_model=d_model, d_state=d_state, conv_kernel=conv_kernel, expand=expand, ff_mult=ff_mult, dropout=dropout, use_official_mamba_ssm=use_official_mamba_ssm) for _ in range(n_vl_layers)])
         self.vl_blocks_norm = RMSNorm(d_model)
@@ -21,7 +21,7 @@ class MambaVLModel(BaseAVSceneModel):
         nn.init.trunc_normal_(self.query_embed, std=0.02)
         nn.init.trunc_normal_(self.vl_pos_embed, std=0.02)
         nn.init.trunc_normal_(self.fusion_pos_embed, std=0.02)
-        if hf_pretrained_mamba_model:
+        if load_pretrained_mamba and hf_pretrained_mamba_model:
             self._load_pretrained_mamba_from_hf(hf_pretrained_mamba_model, ('vl_blocks', 'fusion_blocks'))
         if pretrained_mamba_path:
             self._load_pretrained_mamba_checkpoint(pretrained_mamba_path, pretrained_mamba_prefix, ('vl_blocks.', 'vl_blocks_norm.', 'fusion_blocks.', 'fusion_blocks_norm.'))
