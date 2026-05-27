@@ -43,7 +43,7 @@ trainer:
   eval_parts: ["val"]
   grad_norm_every: 100
   use_amp: true
-  amp_dtype: fp16
+  amp_dtype: bf16
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
   log_keys:
     - loss

@@ -97,6 +97,11 @@ class BaseTrainer:
             logs.update(result)
             for (key, value) in self._select_epoch_logs(logs).items():
                 self.logger.info(f'    {key:15s}: {value}')
+            for key in ('loss', 'logit_mean', 'soft_mean_iou'):
+                if key in self._epoch_log_keys and key not in logs:
+                    self.logger.warning(
+                        f"Metric '{key}' missing from epoch logs (often non-finite values or skipped batches)."
+                    )
             (best, stop_process, not_improved_count) = self._monitor_performance(logs, not_improved_count)
             if best:
                 self._save_checkpoint(epoch, save_best=True, only_best=True)

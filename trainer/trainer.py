@@ -55,8 +55,18 @@ class Trainer(BaseTrainer):
                 batch.update(outputs)
             else:
                 batch['logits'] = outputs
-            all_losses = self.criterion(**batch)
+        logits = batch.get('logits')
+        if logits is None:
+            raise RuntimeError('Model forward did not produce logits.')
+        if not torch.isfinite(logits).all():
+            self.logger.warning('Non-finite logits in batch; skipping loss/metrics for this batch.')
+            return batch
+        all_losses = self.criterion(logits=logits.float(), masks=batch['masks'].float())
         batch.update(all_losses)
+        if self.is_train and not torch.isfinite(batch['loss']):
+            self.logger.warning(f"Non-finite loss ({batch['loss'].item()}); skipping optimizer step.")
+            self.optimizer.zero_grad(set_to_none=True)
+            return batch
         if self.is_train:
             if self._amp_enabled:
                 self.scaler.scale(batch['loss']).backward()

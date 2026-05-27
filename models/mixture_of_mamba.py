@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -161,7 +162,7 @@ class MambaPretrainedMixin:
 
 class Mask2FormerFrameEncoder(nn.Module):
 
-    def __init__(self, d_model, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True):
+    def __init__(self, d_model, encoder_out_channels=1024, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True):
         super().__init__()
         if not _HF_AVAILABLE:
             raise ImportError('transformers is required for Mask2FormerFrameEncoder.')
@@ -180,7 +181,10 @@ class Mask2FormerFrameEncoder(nn.Module):
         if freeze_visual_backbone and loaded_pretrained:
             for p in self.encoder.parameters():
                 p.requires_grad_(False)
-        self.proj = nn.LazyConv2d(d_model, kernel_size=1)
+        self.proj = nn.Conv2d(int(encoder_out_channels), d_model, kernel_size=1)
+        nn.init.xavier_uniform_(self.proj.weight)
+        if self.proj.bias is not None:
+            nn.init.zeros_(self.proj.bias)
 
     def forward(self, frames):
         b, t, c, h, w = frames.shape
@@ -207,6 +211,12 @@ class MaskDecoder(nn.Module):
         super().__init__()
         self.mask_size = int(mask_size)
         self.fuse = nn.Sequential(nn.Conv2d(d_model * 2, d_model, kernel_size=3, padding=1), nn.GELU(), nn.Conv2d(d_model, d_model // 2, kernel_size=3, padding=1), nn.GELU(), nn.Conv2d(d_model // 2, 1, kernel_size=1))
+        head = self.fuse[-1]
+        if isinstance(head, nn.Conv2d):
+            nn.init.xavier_uniform_(head.weight, gain=0.1)
+            if head.bias is not None:
+                prior = 0.15
+                nn.init.constant_(head.bias, math.log(prior / (1.0 - prior)))
 
     def forward(self, query, spatial):
         query_map = query.unsqueeze(-1).unsqueeze(-1).expand_as(spatial)
