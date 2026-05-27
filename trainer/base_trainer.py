@@ -160,9 +160,9 @@ class BaseTrainer:
         if self.mnt_mode != 'off':
             try:
                 if self.mnt_mode == 'min':
-                    improved = logs[self.mnt_metric] <= self.mnt_best
+                    improved = logs[self.mnt_metric] < self.mnt_best
                 elif self.mnt_mode == 'max':
-                    improved = logs[self.mnt_metric] >= self.mnt_best
+                    improved = logs[self.mnt_metric] > self.mnt_best
                 else:
                     improved = False
             except KeyError:
