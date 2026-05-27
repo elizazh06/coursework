@@ -73,6 +73,43 @@ def build_optimizer(model, config, logger):
         )
     return instantiate(config.optimizer, params=param_groups)
 
+def run_startup_sanity_check(model, loss_function, dataloaders, device, logger, device_tensors):
+    train_loader = dataloaders.get('train')
+    if train_loader is None:
+        return
+    try:
+        batch = next(iter(train_loader))
+    except StopIteration:
+        logger.warning('Startup sanity check skipped: train dataloader is empty.')
+        return
+    for key in device_tensors:
+        if key in batch and torch.is_tensor(batch[key]):
+            batch[key] = batch[key].to(device)
+    model.eval()
+    with torch.no_grad():
+        signature = __import__('inspect').signature(model.forward)
+        accepted = set(signature.parameters.keys())
+        model_inputs = {k: v for (k, v) in batch.items() if k in accepted}
+        outputs = model(**model_inputs)
+        logits = outputs['logits'] if isinstance(outputs, dict) else outputs
+        losses = loss_function(logits=logits.float(), masks=batch['masks'].float())
+    logits_f = logits.float()
+    finite = torch.isfinite(logits_f)
+    pred_pos_rate = float((torch.sigmoid(logits_f[finite]) >= 0.5).float().mean().item()) if finite.any() else float('nan')
+    logger.info(
+        'Startup sanity check: '
+        f"logits finite={finite.all().item()}, "
+        f"shape={tuple(logits.shape)}, "
+        f"mean={float(logits_f[finite].mean().item()) if finite.any() else float('nan'):.4f}, "
+        f"min={float(logits_f[finite].min().item()) if finite.any() else float('nan'):.4f}, "
+        f"max={float(logits_f[finite].max().item()) if finite.any() else float('nan'):.4f}, "
+        f"pred_pos_rate={pred_pos_rate:.4f}, "
+        f"loss={float(losses['loss'].item()):.4f}"
+    )
+    lazy_params = sum(isinstance(p, UninitializedParameter) for p in model.parameters())
+    if lazy_params:
+        logger.warning(f'Startup sanity check found {lazy_params} uninitialized lazy parameters. Update code: LazyConv2d should be removed.')
+
 def main(config_path, overrides=None):
     raw_config = load_composed_config(config_path)
     raw_config = apply_dotlist_overrides(raw_config, overrides or [], config_dir=Path(config_path).parent)
@@ -90,6 +127,7 @@ def main(config_path, overrides=None):
     loss_function = instantiate(config.loss_function).to(device)
     metrics = instantiate(config.metrics)
     optimizer = build_optimizer(model, config, logger)
+    run_startup_sanity_check(model, loss_function, dataloaders, device, logger, list(config.trainer.device_tensors))
     lr_scheduler = instantiate(config.lr_scheduler, optimizer=optimizer)
     epoch_len = config.trainer.get('epoch_len')
     trainer = Trainer(model=model, criterion=loss_function, metrics=metrics, optimizer=optimizer, lr_scheduler=lr_scheduler, config=config, device=device, dataloaders=dataloaders, epoch_len=epoch_len, logger=logger, writer=writer, batch_transforms=batch_transforms, skip_oom=config.trainer.get('skip_oom', True))

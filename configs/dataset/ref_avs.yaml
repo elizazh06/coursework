@@ -42,7 +42,7 @@ trainer:
   eval_every: 2
   eval_parts: ["val"]
   grad_norm_every: 100
-  use_amp: true
+  use_amp: false
   amp_dtype: bf16
   device_tensors: ["frames", "audio_feat", "text_feat", "masks"]
   log_keys:
@@ -55,6 +55,9 @@ trainer:
     - target_pos_rate
     - logit_mean
     - logit_std
+    - last_loss
+    - last_logit_mean
+    - last_pred_pos_rate
     - val_loss
     - val_bce_loss
     - val_dice_loss

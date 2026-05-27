@@ -16,6 +16,21 @@ class Trainer(BaseTrainer):
         # - newer: torch.amp.GradScaler(device, ...)
         # - older: torch.cuda.amp.GradScaler(...)
         self.scaler = self._build_grad_scaler()
+        self._last_batch_debug = {}
+
+    def _record_batch_debug(self, batch):
+        logits = batch.get('logits')
+        if logits is None:
+            return
+        logits_f = logits.detach().float()
+        finite = torch.isfinite(logits_f)
+        self._last_batch_debug = {
+            'loss': float(batch['loss'].item()) if 'loss' in batch and torch.isfinite(batch['loss']) else None,
+            'logit_mean': float(logits_f[finite].mean().item()) if finite.any() else None,
+            'logit_min': float(logits_f[finite].min().item()) if finite.any() else None,
+            'logit_max': float(logits_f[finite].max().item()) if finite.any() else None,
+            'pred_pos_rate': float((torch.sigmoid(logits_f) >= 0.5).float().mean().item()) if finite.any() else None,
+        }
 
     def _build_grad_scaler(self):
         if not self._amp_enabled:
@@ -83,6 +98,7 @@ class Trainer(BaseTrainer):
             metrics.update(loss_name, batch[loss_name].item())
         for met in metric_funcs:
             metrics.update(met.name, met(**batch))
+        self._record_batch_debug(batch)
         return batch
 
     def _log_batch(self, batch_idx, batch, mode='train'):

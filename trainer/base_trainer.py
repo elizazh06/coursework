@@ -139,6 +139,10 @@ class BaseTrainer:
             if batch_idx + 1 >= self.epoch_len:
                 break
         logs = self.train_metrics.result() or last_train_metrics
+        if self._last_batch_debug:
+            for key, value in self._last_batch_debug.items():
+                if value is not None and key not in logs:
+                    logs[f'last_{key}'] = value
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
         eval_every = int(self.cfg_trainer.get('eval_every', 1))

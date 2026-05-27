@@ -163,6 +163,7 @@ class MambaPretrainedMixin:
 class Mask2FormerFrameEncoder(nn.Module):
 
     def __init__(self, d_model, encoder_out_channels=1024, pretrained_visual_model='facebook/mask2former-swin-base-ade-semantic', freeze_visual_backbone=True):
+        del encoder_out_channels
         super().__init__()
         if not _HF_AVAILABLE:
             raise ImportError('transformers is required for Mask2FormerFrameEncoder.')
@@ -181,10 +182,24 @@ class Mask2FormerFrameEncoder(nn.Module):
         if freeze_visual_backbone and loaded_pretrained:
             for p in self.encoder.parameters():
                 p.requires_grad_(False)
+        encoder_out_channels = self._infer_encoder_out_channels()
         self.proj = nn.Conv2d(int(encoder_out_channels), d_model, kernel_size=1)
         nn.init.xavier_uniform_(self.proj.weight)
         if self.proj.bias is not None:
             nn.init.zeros_(self.proj.bias)
+
+    @torch.no_grad()
+    def _infer_encoder_out_channels(self) -> int:
+        dummy = torch.zeros(1, 3, 256, 256)
+        out = self.encoder(pixel_values=dummy)
+        fmap = out.feature_maps[-1]
+        if fmap.dim() == 3:
+            return int(fmap.size(2))
+        if fmap.dim() == 4:
+            if fmap.size(1) < fmap.size(-1):
+                return int(fmap.size(-1))
+            return int(fmap.size(1))
+        raise RuntimeError(f'Unexpected feature map shape from Mask2Former encoder: {tuple(fmap.shape)}')
 
     def forward(self, frames):
         b, t, c, h, w = frames.shape
