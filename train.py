@@ -3,6 +3,7 @@ import argparse
 import fnmatch
 from pathlib import Path
 import torch
+from torch.nn.parameter import UninitializedParameter
 from datasets.data_utils import get_dataloaders
 from trainer.trainer import Trainer
 from utils.config import ConfigNode
@@ -14,13 +15,25 @@ warnings.filterwarnings('ignore', category=UserWarning)
 def _match_param(name, patterns):
     return any(fnmatch.fnmatch(name, pattern) or pattern in name for pattern in patterns)
 
+def _format_param_count(named_params):
+    initialized = 0
+    lazy = 0
+    for _, param in named_params:
+        if isinstance(param, UninitializedParameter):
+            lazy += 1
+            continue
+        initialized += param.numel()
+    if lazy:
+        return f'{initialized:,} initialized params + {lazy} lazy params'
+    return f'{initialized:,} params'
+
 def build_optimizer(model, config, logger):
     named_params = [(name, param) for (name, param) in model.named_parameters() if param.requires_grad]
     if not named_params:
         raise RuntimeError('No trainable model parameters found.')
     group_cfgs = list(config.optimizer.get('param_groups', []))
     if not group_cfgs:
-        logger.info(f'Trainable parameters: {sum(p.numel() for _, p in named_params):,}')
+        logger.info(f'Trainable parameters: {_format_param_count(named_params)}')
         return instantiate(config.optimizer, params=[param for _, param in named_params])
 
     assigned = set()
@@ -47,7 +60,7 @@ def build_optimizer(model, config, logger):
         param_groups.append(group)
         logger.info(
             f"Optimizer group '{group_cfg.get('name', ','.join(patterns))}': "
-            f"{sum(p.numel() for _, p in group_named):,} params, "
+            f"{_format_param_count(group_named)}, "
             f"lr={group['lr']}, weight_decay={group['weight_decay']}"
         )
 
@@ -55,7 +68,7 @@ def build_optimizer(model, config, logger):
     if remaining:
         param_groups.append({'params': [param for _, param in remaining], 'lr': base_lr, 'weight_decay': base_weight_decay})
         logger.info(
-            f"Optimizer group 'default': {sum(p.numel() for _, p in remaining):,} params, "
+            f"Optimizer group 'default': {_format_param_count(remaining)}, "
             f"lr={base_lr}, weight_decay={base_weight_decay}"
         )
     return instantiate(config.optimizer, params=param_groups)
