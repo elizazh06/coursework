@@ -10,10 +10,8 @@
 dataset:
   module: ref_avs
   name: RefAVSDataset
-  # Full-training defaults. For a quick smoke/tiny-overfit run, override these
-  # from CLI instead of editing the file, e.g. dataset.params.limit=4.
-  batch_size: 8
-  eval_batch_size: 8
+  batch_size: 32
+  eval_batch_size: 32
   num_workers: 8
   prefetch_factor: 4
   persistent_workers: true
@@ -34,7 +32,7 @@ dataset:
     shuffle_index: false
 
 trainer:
-  n_epochs: 80
+  n_epochs: 60
   monitor: "max val_mean_iou"
   monitor_min_delta: 1.0e-5
   early_stop: 12
