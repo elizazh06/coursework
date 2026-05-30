@@ -4,7 +4,6 @@ import torch
 
 
 def align_logits_to_masks(logits: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
-    """Reshape per-frame logits [B*T, H, W] to [B, T, H, W] using mask layout."""
     if masks.dim() != 4:
         return logits
     b, t = masks.shape[:2]
@@ -27,7 +26,6 @@ def align_logits_to_masks(logits: torch.Tensor, masks: torch.Tensor) -> torch.Te
 def flatten_logits_and_masks(
     logits: torch.Tensor, masks: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Flatten [B, T, ...] tensors to [B*T, ...] for loss/metrics."""
     logits = align_logits_to_masks(logits, masks)
     if logits.dim() == 4:
         b, t, h, w = logits.shape

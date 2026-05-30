@@ -27,9 +27,12 @@ def main(config_path, overrides=None):
     model = instantiate(config.model).to(device)
     print(model)
     metrics = instantiate(config.metrics)
+    loss_function = None
+    if config.get('loss_function') is not None:
+        loss_function = instantiate(config.loss_function).to(device)
     save_path = ROOT_PATH / 'data' / 'saved' / config.inferencer.save_path
     save_path.mkdir(exist_ok=True, parents=True)
-    inferencer = Inferencer(model=model, config=config, device=device, dataloaders=dataloaders, batch_transforms=batch_transforms, save_path=save_path, metrics=metrics, skip_model_load=False)
+    inferencer = Inferencer(model=model, config=config, device=device, dataloaders=dataloaders, batch_transforms=batch_transforms, save_path=save_path, metrics=metrics, criterion=loss_function, skip_model_load=False)
     logs = inferencer.run_inference()
     for part in logs.keys():
         for (key, value) in logs[part].items():

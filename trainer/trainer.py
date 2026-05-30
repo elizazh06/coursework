@@ -12,9 +12,6 @@ class Trainer(BaseTrainer):
         self.use_amp = bool(self.cfg_trainer.get('use_amp', self.device == 'cuda'))
         self.amp_dtype = amp_dtype
         self._amp_enabled = self.use_amp and str(self.device).startswith('cuda')
-        # Torch AMP API differs across versions:
-        # - newer: torch.amp.GradScaler(device, ...)
-        # - older: torch.cuda.amp.GradScaler(...)
         self.scaler = self._build_grad_scaler()
         self._last_batch_debug = {}
 
@@ -41,7 +38,6 @@ class Trainer(BaseTrainer):
             try:
                 return torch.cuda.amp.GradScaler(enabled=True)
             except Exception:
-                # If scaler is unavailable in this torch build, fallback to fp32 path.
                 self._amp_enabled = False
                 return None
 

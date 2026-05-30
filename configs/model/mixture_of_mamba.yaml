@@ -1,8 +1,3 @@
-# Train:
-#   python train.py --config configs/train.yaml dataset=ref_avs model=mixture_of_mamba writer.run_name=mixture_of_mamba dataset.params.data_root=REFAVS
-# Inference:
-#   python inference.py --config configs/inference.yaml dataset=ref_avs model=mixture_of_mamba inferencer.from_pretrained=checkpoints/mixture_of_mamba/model_best.pth dataset.params.data_root=REFAVS
-
 model:
   _target_: models.mixture_of_mamba.MixtureOfMambaModel
 

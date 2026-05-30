@@ -4,7 +4,6 @@ from torch.optim.lr_scheduler import LambdaLR
 
 
 class WarmupCosineLR(LambdaLR):
-    """Cosine decay with a short linear warmup, applied per epoch."""
 
     def __init__(
         self,

@@ -1,12 +1,3 @@
-# Ref-AVS-Bench layout:
-#   <data_root>/metadata.csv
-#   <data_root>/media/<vid>/audio.wav
-#   <data_root>/media/<vid>/frames/{0..9}.jpg
-#   <data_root>/gt_mask/<vid>/fid_<fid>/{00000..00009}.png
-#
-# Relative data_root is resolved in order: cwd, project dir, parent of project dir.
-# Example: repo at ~/coursework, dataset at ~/REFAVS → data_root=REFAVS works.
-
 dataset:
   module: ref_avs
   name: RefAVSDataset
@@ -71,6 +62,10 @@ inferencer:
   save_path: ref_avs_inference
   from_pretrained: checkpoints/ref_avs_baseline/model_best.pth
   metrics_filename: test_metrics.json
+  loss_names:
+    - loss
+    - bce_loss
+    - dice_loss
 
 loss_function:
   _target_: losses.segmentation.SegmentationLoss
@@ -113,6 +108,22 @@ metrics:
       name: boundary_f
     - _target_: metrics.segmentation_metrics.JAndFMetric
       name: j_and_f
+    - _target_: metrics.segmentation_metrics.SoftMeanIoUMetric
+      name: soft_mean_iou
+    - _target_: metrics.segmentation_metrics.DiceCoefficientMetric
+      name: dice_coefficient
+    - _target_: metrics.segmentation_metrics.PixelAccuracyMetric
+      name: pixel_accuracy
+    - _target_: metrics.segmentation_metrics.ForegroundPrecisionMetric
+      name: foreground_precision
+    - _target_: metrics.segmentation_metrics.ForegroundRecallMetric
+      name: foreground_recall
+    - _target_: metrics.segmentation_metrics.ForegroundF1Metric
+      name: foreground_f1
+    - _target_: metrics.segmentation_metrics.PredPositiveRateMetric
+      name: pred_pos_rate
+    - _target_: metrics.segmentation_metrics.TargetPositiveRateMetric
+      name: target_pos_rate
 
 optimizer:
   _target_: torch.optim.AdamW

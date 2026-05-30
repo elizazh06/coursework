@@ -123,3 +123,82 @@ class JAndFMetric:
         j = self._j(**batch)
         f = self._f(**batch)
         return (j + f) / 2.0
+
+def _aligned_pred_and_gt(logits: torch.Tensor, masks: torch.Tensor, threshold: float=0.5):
+    logits, masks = flatten_logits_and_masks(logits, masks)
+    pred = _threshold_masks(logits, threshold)
+    gt = masks.bool().to(pred.device)
+    if pred.shape[-2:] != gt.shape[-2:]:
+        import torch.nn.functional as F
+        gt = F.interpolate(gt.float().unsqueeze(1), size=pred.shape[-2:], mode='nearest').squeeze(1).bool()
+    return (pred, gt)
+
+def _foreground_binary_stats(logits: torch.Tensor, masks: torch.Tensor, threshold: float=0.5):
+    pred, gt = _aligned_pred_and_gt(logits, masks, threshold)
+    pred_flat = pred.flatten(1)
+    gt_flat = gt.flatten(1)
+    tp = (pred_flat & gt_flat).sum(dim=1).float()
+    fp = (pred_flat & ~gt_flat).sum(dim=1).float()
+    fn = (~pred_flat & gt_flat).sum(dim=1).float()
+    return tp, fp, fn
+
+class PixelAccuracyMetric:
+
+    def __init__(self, name: str='pixel_accuracy', threshold: float=0.5):
+        self.name = name
+        self.threshold = float(threshold)
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        pred, gt = _aligned_pred_and_gt(logits, masks, self.threshold)
+        return (pred == gt).float().mean().item()
+
+class DiceCoefficientMetric:
+
+    def __init__(self, name: str='dice_coefficient', threshold: float=0.5, eps: float=1.0):
+        self.name = name
+        self.threshold = float(threshold)
+        self.eps = float(eps)
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        pred, gt = _aligned_pred_and_gt(logits, masks, self.threshold)
+        pred_f = pred.float().flatten(1)
+        gt_f = gt.float().flatten(1)
+        intersection = (pred_f * gt_f).sum(dim=1)
+        denom = pred_f.sum(dim=1) + gt_f.sum(dim=1)
+        dice = (2.0 * intersection + self.eps) / (denom + self.eps)
+        return dice.mean().item()
+
+class ForegroundPrecisionMetric:
+
+    def __init__(self, name: str='foreground_precision', threshold: float=0.5):
+        self.name = name
+        self.threshold = float(threshold)
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        tp, fp, _ = _foreground_binary_stats(logits, masks, self.threshold)
+        precision = tp / (tp + fp + 1e-06)
+        return precision.mean().item()
+
+class ForegroundRecallMetric:
+
+    def __init__(self, name: str='foreground_recall', threshold: float=0.5):
+        self.name = name
+        self.threshold = float(threshold)
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        tp, _, fn = _foreground_binary_stats(logits, masks, self.threshold)
+        recall = tp / (tp + fn + 1e-06)
+        return recall.mean().item()
+
+class ForegroundF1Metric:
+
+    def __init__(self, name: str='foreground_f1', threshold: float=0.5):
+        self.name = name
+        self.threshold = float(threshold)
+
+    def __call__(self, logits: torch.Tensor, masks: torch.Tensor, **_) -> float:
+        tp, fp, fn = _foreground_binary_stats(logits, masks, self.threshold)
+        precision = tp / (tp + fp + 1e-06)
+        recall = tp / (tp + fn + 1e-06)
+        f1 = 2.0 * precision * recall / (precision + recall + 1e-06)
+        return f1.mean().item()

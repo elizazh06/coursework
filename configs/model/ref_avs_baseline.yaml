@@ -1,8 +1,3 @@
-# Train:
-#   python train.py --config configs/train.yaml dataset=ref_avs model=ref_avs_baseline writer.run_name=ref_avs_baseline dataset.params.data_root=REFAVS
-# Inference:
-#   python inference.py --config configs/inference.yaml dataset=ref_avs model=ref_avs_baseline inferencer.from_pretrained=checkpoints/ref_avs_baseline/model_best.pth dataset.params.data_root=REFAVS
-
 model:
   _target_: models.ref_avs_baseline.RefAVSBaselineModel
 
