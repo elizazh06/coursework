@@ -1,3 +1,4 @@
+.vscode-extensions/
 venv/
 .vscode/
 __pycache__/
@@ -14,3 +15,15 @@ runs/
 *.err
 
 .ipynb_checkpoints/
+
+report/.build/
+report/*.log
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.bcf
+report/*.run.xml
+report/*.fdb_latexmk
+report/*.fls
+report/*.toc
+report/*.synctex.gz
