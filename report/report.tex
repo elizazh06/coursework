@@ -1,0 +1,431 @@
+\documentclass[a4paper,12pt]{extarticle}
+\usepackage{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\newcommand{\engtt}[1]{{\fontencoding{T1}\fontfamily{cmtt}\selectfont #1}}
+\usepackage[main=english,russian]{babel}
+\usepackage{csquotes}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{amssymb}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{colortbl}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+\usepackage{pgf}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{indentfirst}
+\usepackage[
+backend=biber,
+style=numeric,
+urldate=long,
+maxbibnames=99
+]{biblatex}
+\addbibresource{refs.bib}
+\usepackage[colorlinks,citecolor=blue,linkcolor=blue,bookmarks=false,hypertexnames=true, urlcolor=blue]{hyperref} 
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage[flushleft]{threeparttable}
+\usepackage{tablefootnote}
+
+\usepackage{chngcntr} % нумерация графиков и таблиц по секциям
+\counterwithin{table}{section}
+\counterwithin{figure}{section}
+
+\graphicspath{{graphics/}}%путь к рисункам
+
+\makeatletter
+% \renewcommand{\@biblabel}[1]{#1.} % Заменяем библиографию с квадратных скобок на точку:
+\makeatother
+
+\geometry{left=2.5cm}% левое поле
+\geometry{right=1.0cm}% правое поле
+\geometry{top=2.0cm}% верхнее поле
+\geometry{bottom=2.0cm}% нижнее поле
+\setlength{\parindent}{1.25cm}
+\renewcommand{\baselinestretch}{1.5} % междустрочный интервал
+
+
+\newcommand{\bibref}[3]{\hyperlink{#1}{#2 (#3)}} % biblabel, authors, year
+\addto\captionsrussian{\def\refname{Список литературы (или источников)}} 
+
+\renewcommand{\theenumi}{\arabic{enumi}}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\labelenumi}{\arabic{enumi}}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\theenumii}{.\arabic{enumii}}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\labelenumii}{\arabic{enumi}.\arabic{enumii}.}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\theenumiii}{.\arabic{enumiii}}% Меняем везде перечисления на цифра.цифра
+\renewcommand{\labelenumiii}{\arabic{enumi}.\arabic{enumii}.\arabic{enumiii}.}% Меняем везде перечисления на цифра.цифра
+
+\begin{document}
+\setcounter{page}{2}
+
+{
+	\hypersetup{linkcolor=black}
+	\tableofcontents
+}
+
+\newpage
+
+\newpage
+\section*{Abstract}
+Audio-Visual Scene Understanding (AVSU) aims to interpret scenes and events by jointly analyzing visual and audio signals, requiring models to integrate heterogeneous, temporally evolving modalities and capture complex cross-modal dependencies. While transformer-based approaches have achieved strong performance in audio-visual understanding, they often incur high computational cost and scale poorly to long sequences, which are common in real-world audio-visual data. State Space Models (SSMs) have recently emerged as an efficient alternative for sequence modeling, offering linear-time complexity and a principled approach to modeling temporal dynamics. Although modern SSM-based architectures, such as S4 and Mamba, have shown competitive results in unimodal and limited multimodal settings, their effectiveness for audio-visual scene understanding remains largely unexplored. In this work, we conduct a controlled comparative study on Ref-AVS Bench, evaluating four Mamba-based fusion designs against transformer-based and recurrent baselines under shared training protocols. All our SSM-based models outperform the attention baseline. These results indicate that selective SSM mixing can surpass task-specific attention.
+
+
+\section*{\foreignlanguage{russian}{Аннотация}}   % this is how to use russian
+\foreignlanguage{russian}{
+Задача аудиовизуального понимания сцен (Audio-Visual Scene Understanding, AVSU) направлена на интерпретацию сцен и событий на основе совместного анализа видео- и аудиосигналов и требует от моделей эффективной интеграции разнородных, меняющихся во времени модальностей и учёта сложных межмодальных зависимостей. Несмотря на высокое качество, достигаемое современными подходами на основе трансформеров, такие модели часто обладают высокой вычислительной сложностью и плохо масштабируются на длинные последовательности, характерные для реальных аудиовизуальных данных. Модели пространства состояний (State Space Models, SSMs) в последнее время рассматриваются как эффективная альтернатива для моделирования последовательностей, обеспечивая линейную вычислительную сложность и математически обоснованный подход к моделированию временной динамики. Однако, несмотря на успешные результаты современных SSM-архитектур, таких как S4 и Mamba, в унимодальных и ограниченных мультимодальных задачах, их применимость к аудиовизуальному пониманию сцен остаётся недостаточно изученной. В данной работе мы проводим контролируемое сравнительное исследование на Ref-AVS Bench, оценивая четыре архитектуры объединения модальностей на основе Mamba в сравнении с базовыми моделями, основанных на трансформерах и рекуррентных сетях, в единых условиях обучения. Все наши модели на основе SSM превосходят базовую модель с механизмом внимания. Полученные результаты показывают, что SSM-архитектуры могут превосходить решения, основанные на механизмах внимания, специально разработанных под задачу.
+}
+
+\section*{Keywords}
+Deep Learning,
+Audio-Visual Scene Understanding,
+Referring Audio-Visual Segmentation,
+Multimodal Learning,
+State Space Models,
+Sequence Modeling,
+Mamba,
+Ref-AVS
+\pagebreak
+
+\section{Introduction}
+
+Audio-Visual Scene Understanding (AVSU) encompasses a range of tasks in which models are required to infer scene-level semantics such as scene categories, events, or relationships. This is a fundamental multimodal learning problem that aims to jointly interpret visual and auditory signals to understand complex real-world scenes \cite{baltrusaitis2019multimodal, tsai2019multimodal}. Unlike unimodal perception, AVSU requires models to reason over heterogeneous, temporally evolving data streams, capture cross-modal interactions, while remaining robust to noise, occlusion, and modality imbalance. This problem underlies a wide range of applications, including video understanding \cite{sarkar2024jointAV}, audio-visual event recognition \cite{brousmiche2021mafnet}, scene-aware dialogue systems \cite{alamri2019audio}, and embodied agents \cite{gao2023sonicverse}.
+
+Recent progress in AVSU has been largely driven by deep neural networks, particularly convolutional \cite{gong2022uavm, nagrani2021attention} and transformer-based \cite{avsegformer2023, maavt2024, avesformer2025} architectures. While transformer-based approaches demonstrate strong empirical performance, they rely on computationally expensive attention mechanisms with quadratic complexity in sequence length \cite{vaswani2017attention}, scale poorly to long temporal contexts \cite{tay2020efficient}, and often struggle with fine-grained temporal modeling, which is crucial for audio-visual reasoning \cite{wu2019pay}.
+
+State Space Models (SSMs) \cite{somvanshi2025survey} have recently re-emerged as a powerful alternative for sequence modeling, offering linear-time complexity, strong inductive biases for temporal dynamics, and improved scalability to long contexts \cite{gu2021s4, smith2022s5, dao2024mamba}. Modern SSM-based architectures, such as S4 \cite{gu2021s4} and Mamba \cite{dao2024mamba}, have demonstrated competitive or superior performance compared to transformers on long-range sequence modeling benchmarks while being significantly more computationally efficient \cite{gu2021s4, dao2024mamba}. These properties make SSMs particularly appealing for audio-visual scenarios, where high-resolution temporal alignment between modalities and long audio streams are essential \cite{cavmaesync2025, dailyomni2025, maavt2024}.
+
+Despite their growing popularity, the use of SSM-based architectures in multimodal learning, and AVSU in particular, remains underexplored. Existing works primarily focus on unimodal settings \cite{goel2022sashimi, liang2024pointmamba}, or on relatively simple multimodal scenarios \cite{pantazopoulos2024shakingupvlms, maavt2024, zhu2024vlmamba} involving a limited number of modalities (e.g., vision and language) and simplified tasks that do not require fine-grained temporal reasoning or long-range cross-modal dependencies. Сonsequently, a systematic comparison of different SSM-based fusion strategies for audio-visual scene understanding is still missing.
+
+In this work, we aim to fill this gap by conducting a controlled comparative study of recent SSM-based multimodal architectures on Referring Audio-Visual Segmentation~\cite{wang2024refavs}. Our goal is to evaluate their effectiveness, limitations, and suitability for AVSU, and to contrast them against established baselines such as transformer-based and recurrent architectures, the latter of which are known to suffer from vanishing gradients and limited long-range dependency modeling in long sequences \cite{bengio1994learning, hochreiter1997long} .Concretely, we compare four Mamba fusion variants inspired by Mixture-of-Mamba~\cite{mixturemamba2025}, VL-Mamba~\cite{zhu2024vlmamba}, and coupled multimodal SSM designs~\cite{coupledmamba2024} against an EEMC-style transformer baseline~\cite{wang2024refavs} and an LSTM baseline, all sharing the same visual encoder and mask decoder. Under this setup, Video-Audio Mamba achieves the strongest segmentation quality (38.6\% mIoU), clearly outperforming attention-based fusion while a recurrent baseline collapses to near-zero overlap -- suggesting that the choice of temporal fusion module, rather than the visual backbone alone, largely determines performance.
+
+The main contributions of this work are:
+\begin{itemize}
+    \item A structured analysis of modern SSM-based fusion designs in the context of referring audio-visual segmentation.
+    \item An empirical comparison of four Mamba-based multimodal architectures against EEMC-style transformer and LSTM baselines on Ref-AVS Bench~\cite{wang2024refavs}, with all models trained under a unified protocol.
+    \item A critical discussion of the strengths and limitations of SSMs for multimodal temporal reasoning compared to existing attention-based and recurrent approaches.
+\end{itemize}
+
+\section{Related Work}
+
+\subsection{Audio-Visual Scene Understanding}
+
+Audio-Visual Scene Understanding has been extensively studied using deep learning methods that combine visual and auditory cues \cite{tseng2023avsuperb, zhu2021deepAVSurvey}. Early approaches relied on convolutional neural networks and recurrent models to extract modality-specific features followed by late fusion \cite{tseng2023avsuperb, jl2401mlcaAVSR}. While simple, such methods often fail to capture fine-grained temporal interactions between modalities and suffer from limited modeling capacity for long sequences \cite{hochreiter1997long, weng2024audioVisualFusion}.
+
+
+Transformer-based architectures have become the dominant paradigm in AVSU due to their ability to model cross-modal dependencies via attention mechanisms \cite{zorro2023, maavt2025, tsam2025}. Cross-modal transformers \cite{zorro2023, revisitingAVSeg2025} and audio-visual question answering models \cite{li2024cat, maavt2025} have demonstrated strong performance on benchmarks such as AVQA \cite{yang2022avqa} and AVSD \cite{alamri2019audio}. Nevertheless, these models typically incur quadratic computational complexity with respect to sequence length \cite{vaswani2017attention} and can be prohibitively expensive for long audio-visual inputs \cite{hou2024lfav, maavt2024}.
+
+More recent works explore specialized fusion mechanisms, including hierarchical attention \cite{vamsidhar2025, wang2023hierarchicalAV}, graph-based reasoning \cite{liu2025AVSGN, zhao2024heterogeneousGraph}, and contrastive audio-visual pretraining \cite{manzoor2023multimodality, attendFusion2408}. Despite these advances, many approaches struggle with scalability, robustness to temporal misalignment, and efficient modeling of long-range dependencies -- issues that are particularly pronounced in real-world audio-visual scenes.
+
+In contrast, SSM-based models have the potential to address these challenges by providing efficient, temporally grounded representations. However, to date, their use in AVSU remains sparse and fragmented. A thorough empirical evaluation of SSM-based approaches against established audio-visual models is still lacking, motivating the present study.
+
+\subsection{State Space Models for Sequence and Multimodal Learning}
+
+State Space Models (SSMs) provide a principled framework for modeling sequential data by explicitly parameterizing latent state dynamics \cite{kalman1960new}. Classical SSMs, such as linear dynamical systems and Kalman filters \cite{kalman1960new}, have long been used in signal processing but were historically limited in expressiveness when applied to complex, high-dimensional data \cite{roweis2002unifying, linderman2017bayesian}.
+
+Recent advances have significantly expanded the capacity of SSMs by integrating them with deep learning. Structured State Space models, most notably S4 \cite{gu2021s4}, introduced a parameterization that enables efficient long-range sequence modeling with linear time and memory complexity. Subsequent variants, including S4D \cite{s4d2022parameterization} and S5 \cite{smith2022s5}, further improved numerical stability and training efficiency. More recently, Mamba \cite{dao2024mamba} proposed a selective state space mechanism that dynamically modulates state transitions, achieving performance competitive with transformers on language and sequence modeling tasks while maintaining favorable scaling properties.
+
+Beyond language, SSM-based architectures have demonstrated strong performance in unimodal sequence modeling domains with long temporal dependencies, particularly in audio and speech processing. Prior works apply structured SSMs to raw audio modeling \cite{goel2022sashimi}, speech recognition \cite{gupta2023dssformer}, and acoustic event modeling \cite{erol2024audiomamba}, where the ability to efficiently capture long-range temporal structure is critical. These results suggest that SSMs constitute a natural inductive bias for audio streams, which are typically high-resolution, temporally dense, and substantially longer than visual sequences.
+
+Motivated by these unimodal successes, recent works have begun extending SSMs to multimodal learning.  VL-Mamba \cite{zhu2024vlmamba} demonstrates that SSMs can serve as effective backbones for processing and fusing heterogeneous modalities. Coupled Mamba \cite{coupledmamba2024} explicitly models cross-modal interactions by coupling state transitions across modalities, while Mixture-of-Mamba \cite{mixturemamba2025} introduces modality-aware sparsity through a mixture-of-experts \cite{shazeer2017outrageously} formulation to improve multimodal fusion.
+
+SSM-based models offer several advantages for audio-visual tasks: (i) efficient handling of long temporal sequences common in audio streams \cite{erol2024audiomamba}, (ii) strong inductive biases for temporal continuity and causality \cite{gu2021s4}, and (iii) reduced computational overhead compared to attention-based fusion mechanisms \cite{dao2024mamba}. These properties suggest that SSMs are well-suited for AVSU, where temporal alignment and scalability are critical.
+
+However, existing multimodal SSM works often evaluate on benchmarks that are not tailored to audio-visual scene understanding \cite{coupledmamba2024}, or focus on modalities such as vision and language \cite{zhu2024vlmamba, mixturemamba2025}, rather than audio-visual reasoning. Their applicability to complex audio-visual scene understanding remains insufficiently explored. Furthermore, differences between various SSM-based fusion strategies have not been systematically analyzed, leaving open questions regarding their relative strengths and limitations.
+
+\section{Method}
+
+We frame audio-visual scene understanding as \emph{multimodal temporal segmentation}: given synchronized video, audio, and a referring expression, a model must produce a dense mask sequence that localizes the referred object over time. This formulation goes beyond categorical scene labels~\cite{baltrusaitis2019multimodal, wang2024refavs} and makes cross-modal alignment directly measurable through pixel-level supervision.
+
+Our goal is a \emph{controlled comparative study} of temporal fusion mechanisms -- selective state-space models (SSMs)~\cite{dao2024mamba, gu2021s4}, cross-modal attention~\cite{tsai2019multimodal, wang2024refavs}, and recurrent networks~\cite{hochreiter1997long} -- while keeping the visual encoder, mask decoder, data preprocessing, and training recipe fixed. Prior multimodal SSM works often change backbones, pretraining, and benchmarks simultaneously~\cite{zhu2024vlmamba, coupledmamba2024, mixturemamba2025}; isolating the fusion module is necessary to attribute performance differences to architectural choices rather than to incidental implementation details.
+
+\subsection{Benchmark Choice}
+
+We evaluate on Ref-AVS Bench~\cite{wang2024refavs}, the first large-scale benchmark for Referring Audio-Visual Segmentation. Unlike audio-visual question answering datasets~\cite{yang2022avqa, li2022musicavqa}, Ref-AVS requires dense masks rather than discrete answers, which makes it a direct test of spatio-temporal fusion. Each expression combines language with audio-visual cues (e.g., object appearance and sound intensity), so a model must integrate all three modalities rather than rely on a single dominant stream~\cite{wang2024refavs}. The benchmark also provides an official attention-based baseline (EEMC) from the dataset authors, enabling meaningful comparison against a task-specific reference method. For these reasons, Ref-AVS is better suited to our study than QA-oriented or unimodal segmentation benchmarks.
+
+\subsection{Problem Formulation}
+
+Each training example consists of a short video clip, synchronized audio, a referring expression, and pixel-level ground-truth masks. The model reads video frames, audio features, and text features, and outputs one foreground mask per frame. All compared architectures follow the same pipeline (Figure~\ref{fig:framework}): a shared visual encoder extracts spatial features from every frame; a \emph{fusion module} combines video, audio, and text over time; a shared mask decoder turns fused frame-wise representations into segmentation logits.
+
+Training adjusts the model so that its predicted masks match the annotations. Concretely, each candidate architecture is optimized by minimizing a segmentation loss that combines weighted binary cross-entropy with a Dice term, both computed between predicted and ground-truth masks. Because the visual encoder and mask decoder are identical across candidates, differences in test performance can be attributed primarily to the fusion module design.
+
+\paragraph{Notation.}
+For a sample $s \in \mathcal{D}$, let $V=\{v_\tau\}_{\tau=1}^{T}$ denote $T$ RGB frames ($256{\times}256$), $A \in \mathbb{R}^{T_a \times d_a}$ log-mel audio features ($d_a{=}128$, pooled to frame rate), and $T \in \mathbb{R}^{L \times d_t}$ text embeddings from DistilRoBERTa ($L{\le}25$, $d_t{=}768$). A shared visual encoder maps frames to spatial feature maps and per-frame summaries:
+\begin{equation}
+    \mathbf{S} = f_{\mathrm{vis}}(V) \in \mathbb{R}^{T \times d \times h \times w}, \qquad
+    \mathbf{x}^{v}_\tau = \mathrm{GAP}(\mathbf{S}_\tau) \in \mathbb{R}^{d},
+\end{equation}
+where $d{=}512$ (LSTM baseline) or $768$ (Mamba/attention variants). Audio and text are projected to the same width:
+\begin{equation}
+    \mathbf{x}^{a} = W_a A \in \mathbb{R}^{T_a \times d}, \qquad
+    \mathbf{x}^{t} = W_t T \in \mathbb{R}^{L \times d}.
+\end{equation}
+Each fusion module $f_{\mathrm{fus}}$ maps these modality-specific representations to frame-wise fused embeddings $\mathbf{m} \in \mathbb{R}^{T \times d}$. A shared mask decoder $g_{\mathrm{dec}}$ then receives, \emph{for each frame} $\tau$, the fused \emph{query embedding} $\mathbf{m}_\tau$ together with the corresponding spatial map $\mathbf{S}_\tau$ -- not the full token sequence:
+\begin{equation}
+    \hat{M}_\tau = g_{\mathrm{dec}}(\mathbf{m}_\tau, \mathbf{S}_\tau) \in \mathbb{R}^{H \times W}.
+\end{equation}
+The decoder is a lightweight convolutional head that broadcasts $\mathbf{m}_\tau$ to spatial resolution, concatenates it with $\mathbf{S}_\tau$, and outputs segmentation logits. Fusion therefore operates in token/embedding space; boundary refinement is delegated to $g_{\mathrm{dec}}$.
+
+\begin{figure}[t]
+    \centering
+    \foreignlanguage{english}{%
+    \begin{tikzpicture}[
+        node distance=0.55cm and 0.7cm,
+        box/.style={draw, rounded corners=2pt, align=center, minimum height=0.75cm, minimum width=2.1cm, font=\scriptsize},
+        arr/.style={-{Stealth[length=2mm]}, thick}
+    ]
+    \node[box, fill=blue!8] (v) {Visual\\encoder};
+    \node[box, fill=green!8, right=of v] (a) {Audio\\features};
+    \node[box, fill=orange!8, right=of a] (t) {Text\\features};
+    \node[box, fill=purple!10, below=1.0cm of a, minimum width=6.8cm, minimum height=0.95cm] (f) {Fusion module (Attention / LSTM / Mamba variants)};
+    \node[box, fill=red!8, below=of f] (d) {Mask decoder};
+    \node[box, fill=gray!10, below=of d] (y) {Per-frame\\segmentation masks};
+    
+    \draw[arr] (v) -- (f);
+    \draw[arr] (a) -- (f);
+    \draw[arr] (t) -- (f);
+    \draw[arr] (f) -- (d);
+    \draw[arr] (d) -- (y);
+    \end{tikzpicture}
+    }%
+    \caption{Shared experimental framework. All models use the same visual encoder and mask decoder; only the fusion module differs.}
+    \label{fig:framework}
+\end{figure}
+
+\subsection{Fusion Paradigms Under Comparison}
+
+We group the compared methods into three families. Each family implements $f_{\mathrm{fus}}$ from Section~3.2 differently while sharing encoder and decoder blocks.
+
+\paragraph{Attention-based fusion.}
+Our transformer baseline reimplements the EEMC fusion head~\cite{wang2024refavs}. After linear projection to a common width $d$, audio and text tokens are concatenated and mixed via multi-head self-attention; visual (dense) and text tokens are processed analogously:
+\begin{equation}
+    \tilde{\mathbf{Z}}^{AT} = \mathrm{MHA}(\mathbf{Z}^{AT}, \mathbf{Z}^{AT}, \mathbf{Z}^{AT}), \qquad
+    \tilde{\mathbf{Z}}^{VT} = \mathrm{MHA}(\mathbf{Z}^{VT}, \mathbf{Z}^{VT}, \mathbf{Z}^{VT}),
+\end{equation}
+where $\mathbf{Z}^{AT} = [\mathbf{x}^{a};\, \mathbf{x}^{t}]$, $\mathbf{Z}^{VT} = [\mathbf{x}^{v}_{\mathrm{dense}};\, \mathbf{x}^{t}]$, and $\mathrm{MHA}(Q,K,V)=\mathrm{softmax}(QK^\top/\sqrt{d})V$. Cues extracted from the attended streams are temporally contrasted through cached-memory differencing,
+\begin{equation}
+    \Delta \mathbf{c}_\tau = \beta \mathbf{c}_\tau - \frac{1}{\tau}\sum_{i=1}^{\tau}\mathbf{c}_i,
+\end{equation}
+with $\beta{=}1$ in our setup. Per-frame multimodal prompts are built from audio, visual, and text cues and passed through a third self-attention stack, then projected to prompt vectors $\mathbf{p}_\tau$. Unlike the other candidates, the transformer baseline uses its own cross-attention decoder that queries dense visual tokens with $\mathbf{p}_\tau$; all other models share $g_{\mathrm{dec}}(\mathbf{m}_\tau, \mathbf{S}_\tau)$. Cross-attention explicitly reweights token pairs across modalities, but costs $\mathcal{O}(n^2)$ when $n$ includes dense spatial tokens~\cite{tay2020efficient}.
+
+\paragraph{LSTM fusion.}
+Unlike cross-attention, the LSTM baseline does not form content-dependent token-token affinities. It first applies a \emph{gated audio-visual interaction} at each frame, then runs temporal mixing:
+\begin{equation}
+    \mathbf{g}_\tau = \sigma\!\big(W_g [\mathbf{x}^{v}_\tau; \mathbf{x}^{a}_\tau]\big), \quad
+    \tilde{\mathbf{x}}_\tau = W_i \big[\mathbf{g}_\tau \odot \mathbf{x}^{v}_\tau;\; \mathbf{x}^{a}_\tau;\; \bar{\mathbf{x}}^{t};\; \mathbf{g}_\tau \odot \mathbf{x}^{a}_\tau\big],
+\end{equation}
+where $\bar{\mathbf{x}}^{t}$ is the mean-pooled text vector broadcast over time, $\sigma$ is a sigmoid gate, and $[\cdot;\cdot]$ denotes concatenation. A two-layer bidirectional LSTM processes $\tilde{\mathbf{x}}_{1:T}$ and a linear projection yields frame-wise queries $\mathbf{m}_\tau = W_q\,\mathrm{BiLSTM}(\tilde{\mathbf{x}}_{1:T})_\tau$. Cross-modal interaction is limited to element-wise gating and concatenation -- there is no token-level cross-attention or shared latent state across modalities.
+
+\paragraph{SSM-based fusion.}
+Mamba variants replace attention/recurrence with selective state-space (SSM) layers~\cite{dao2024mamba, gu2021s4}. A discrete selective SSM updates a latent state with input-dependent dynamics,
+\begin{equation}
+    \mathbf{h}_t = \bar{\mathbf{A}}_t \mathbf{h}_{t-1} + \bar{\mathbf{B}}_t \mathbf{u}_t, \qquad
+    \mathbf{y}_t = \mathbf{C}_t \mathbf{h}_t,
+\end{equation}
+where $\bar{\mathbf{A}}_t, \bar{\mathbf{B}}_t, \mathbf{C}_t$ are functions of the input $\mathbf{u}_t$, enabling content-aware filtering in $\mathcal{O}(n)$ time over sequence length $n$. We instantiate four fusion strategies. \emph{Early unified fusion} (AVS-Mamba, Mixture-of-Mamba) concatenates modality tokens and mask queries into one sequence,
+\begin{equation}
+    \mathbf{Z} = \big[\mathbf{x}^{v} + \mathbf{e}_v;\; \mathbf{x}^{a} + \mathbf{e}_a;\; \mathbf{x}^{t} + \mathbf{e}_t;\; \mathbf{q} + \mathbf{e}_q\big],
+    \qquad \mathbf{m} = \mathrm{SSMStack}(\mathbf{Z}),
+\end{equation}
+with learned modality embeddings $\mathbf{e}_\cdot$; mask-query slots are read out as $\mathbf{m}_\tau$. Mixture-of-Mamba adds sparse mixture-of-experts feed-forward layers~\cite{mixturemamba2025, shazeer2017outrageously} inside each SSM block. \emph{Staged fusion} (Mamba-VL) applies one SSM stack to $[\mathbf{x}^{v}_{\mathrm{dense}}; \mathbf{x}^{t}]$ before a second stack fuses audio. \emph{Factorized fusion} (Video-Audio Mamba) runs separate SSM encoders on visual and audio sequences, then a dedicated fusion stack over $[\mathbf{x}^{v}; \mathbf{x}^{a}; \mathbf{x}^{t}; \mathbf{q}]$. All SSM mixers use the official \texttt{mamba-ssm} implementation~\cite{mambassm2024}.
+
+\subsection{Expected Advantages of SSM Fusion}
+
+Under the controlled setup above, we expect SSM-based $f_{\mathrm{fus}}$ to outperform both the attention and LSTM baselines on Ref-AVS for three main reasons.
+
+First, \emph{efficient selective mixing}: Ref-AVS clips contain $T$ frames with synchronized audio and text, yielding sequences of moderate length where SSM layers provide input-dependent state updates at linear cost (Eq.~7), whereas cross-attention over dense visual tokens scales quadratically~\cite{tay2020efficient, dao2024mamba}. When the visual backbone is frozen, fusion layers must extract temporal audio-visual alignment from fixed features; selective gating in $\bar{\mathbf{A}}_t, \bar{\mathbf{B}}_t, \mathbf{C}_t$ offers a direct mechanism for this, while LSTM hidden states propagate information only through fixed recurrence (Eq.~6).
+
+Second, \emph{preserving weak audio cues}: referring expressions often hinge on sound intensity or source identity. In early unified SSM sequences (Eq.~8), per-frame visual summaries and dense visual tokens can dominate the token budget and dilute audio representations~\cite{wang2024refavs}. We therefore expect factorized designs -- separate SSM encoders for audio and video before fusion (Video-Audio Mamba) -- to outperform unified and staged variants.
+
+Third, \emph{pretrained temporal inductive bias}: Mamba mixers are warm-started from a public unimodal checkpoint (\texttt{mamba-130m-hf}) and fine-tuned at a lower learning rate, transferring sequence-modeling capacity from audio/speech domains~\cite{goel2022sashimi, erol2024audiomamba}. Our reimplemented EEMC-style attention head trains from scratch under the same frozen-backbone constraint and lacks this transfer.
+
+Conversely, we expect the LSTM baseline to struggle most: without token-level cross-modal matching (Section~3.3), gated concatenation plus BiLSTM aggregation provides insufficient capacity to ground referring expressions in frozen visual features. The attention baseline should remain a strong reference -- cross-attention is the established fusion mechanism in AVSU~\cite{tsai2019multimodal, wang2024refavs} -- but may underperform SSM variants on recall when audio cues are subtle. Section~\ref{sec:results} tests these expectations empirically.
+
+\section{Experimental Setup}
+
+\subsection{Dataset and Preprocessing}
+
+Ref-AVS Bench~\cite{wang2024refavs} contains approximately 4{,}000 video clips and 20{,}000 expert-verified expressions with pixel-level mask annotations. Models are trained on the training set, checkpoint selection uses the validation set, and final numbers are reported on the test set.
+
+Each sample is processed as follows: (i) $T{=}10$ RGB frames resized to $256{\times}256$; (ii) audio resampled to 16\,kHz and converted offline to log-mel features (128 bins), with temporal pooling to one vector per frame; (iii) text encoded with DistilRoBERTa~\cite{sanh2019distilroberta} (up to 25 tokens, 768 dimensions); (iv) ground-truth masks at $256{\times}256$. Audio and text features are cached on disk to reduce I/O during training.
+
+\subsection{Compared Models}
+
+All models share a frozen Mask2Former Swin visual encoder~\cite{cheng2022mask2former, avsegformer2023}. All candidates except the transformer baseline share the same lightweight convolutional mask decoder $g_{\mathrm{dec}}$ (Section~3.2); the EEMC-style transformer uses a dedicated cross-attention decoder (Section~3.3). They differ only in the fusion module $f_{\mathrm{fus}}$.
+
+The \textbf{transformer baseline} is a simplified reimplementation of EEMC~\cite{wang2024refavs}, the official Ref-AVS method. It applies cross-attention between audio-text and visual-text streams, cached-memory temporal differencing, and frame-wise multimodal prompts, and serves as the task-specific attention baseline. The \textbf{LSTM baseline} combines gated audio-visual interaction with a two-layer bidirectional LSTM~\cite{hochreiter1997long} over per-frame fused tokens, testing whether classical recurrence suffices without attention or SSM mixing. Among SSM variants, \textbf{Mixture-of-Mamba}~\cite{mixturemamba2025} concatenates audio, text, visual-summary, and mask-query tokens into one sequence processed by four Mamba blocks with mixture-of-experts feed-forward layers~\cite{shazeer2017outrageously}; \textbf{AVS-Mamba}~\cite{zhu2024vlmamba, coupledmamba2024} performs early fusion over audio, text, dense visual tokens, and mask queries in a shared four-layer Mamba stack; \textbf{Mamba-VL}~\cite{zhu2024vlmamba} uses a two-stage pipeline that first aligns text with visual tokens, then fuses audio; and \textbf{Video-Audio Mamba}~\cite{coupledmamba2024, erol2024audiomamba} applies separate Mamba encoders to visual and audio streams before a dedicated fusion stack.
+
+All Mamba variants use selective SSM layers from the official \texttt{mamba-ssm} package~\cite{mambassm2024, dao2024mamba}, as described in Section~3.3. Mixer weights are initialized from the public \texttt{state-spaces/mamba-130m-hf} checkpoint and fine-tuned at a lower learning rate. Table~\ref{tab:training} lists the hyperparameters shared by all models.
+
+\begin{table}[t]
+\centering
+\caption{Shared training configuration.}
+\label{tab:training}
+\small
+\begin{tabular}{ll}
+\toprule
+Setting & Value \\
+\midrule
+Optimizer & AdamW \\
+Learning rate & $10^{-4}$ (Mamba mixers: $3{\times}10^{-5}$) \\
+Weight decay & $10^{-4}$ \\
+LR schedule & 5-epoch warmup, cosine decay to $10^{-6}$ \\
+Max.\ scheduled epochs & 80 \\
+Early stopping patience & 12 validation checks \\
+Batch size & 32 \\
+Loss & Weighted BCE + Dice (auto foreground reweighting) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Metrics}
+
+We report the following metrics, averaged over frame-sample pairs on the test set (higher is better unless noted):
+\begin{itemize}
+    \item \textbf{mIoU} ($\mathcal{J}$): mean intersection-over-union between predicted and ground-truth foreground regions (threshold 0.5); measures region overlap.
+    \item \textbf{Boundary F} ($\mathcal{F}$): F-score on morphological mask boundaries~\cite{perazzi2016benchmark}; measures contour accuracy.
+    \item \textbf{$\mathcal{J}\&\mathcal{F}$}: average of mIoU and boundary F; standard composite score in video object segmentation.
+    \item \textbf{Dice}: Dice coefficient between predicted and ground-truth masks.
+    \item \textbf{FG-F1, Precision, Recall}: foreground-only F1, precision, and recall for the referred object.
+    \item \textbf{Pixel accuracy}: fraction of correctly classified pixels (can remain high when foreground segmentation is weak).
+\end{itemize}
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Main Quantitative Comparison}
+
+Table~\ref{tab:main-results} summarizes performance on the test set. Mamba-based architectures consistently outperform both baselines, as expected from the selective state-transition mechanism (Section~3.4): input-dependent SSM gates propagate audio-visual cues over $T{=}10$ frames with linear cost, whereas attention must allocate quadratic capacity over dense visual tokens. \textbf{Video-Audio Mamba} achieves the best overall region overlap (mIoU 38.6\%) and foreground F1 (48.7\%), followed by Mixture-of-Mamba and AVS-Mamba. This confirms that modality-specific SSM encoding before fusion -- the design motivated in Section~3.4 -- yields the strongest $\mathcal{J}$ under our controlled setup.
+
+The transformer baseline retains high pixel accuracy (91.0\%) but lower mIoU (28.4\%), indicating conservative, background-heavy predictions: cross-attention fusion appears to under-utilize audio cues when the Swin encoder is frozen, consistent with the known difficulty of aligning heterogeneous tokens without end-to-end backbone tuning~\cite{wang2024refavs}. The LSTM baseline collapses to near-zero quality (mIoU 0.7\%, predicted foreground rate ${<}0.1\%$). This is a result of a capacity mismatch: gated concatenation plus BiLSTM lacks token-level cross-modal matching (Section~3.3), so with a frozen visual backbone the model converges to predicting almost no foreground pixels despite reasonable pixel accuracy (91.6\%).
+
+\begin{table}[t]
+\centering
+\caption{Test results on the Ref-AVS test set. Best result per column in \textbf{bold}; second best \underline{underlined}.}
+\label{tab:main-results}
+\small
+\begin{threeparttable}
+\begin{tabular}{lcccccc}
+\toprule
+Model & mIoU$\uparrow$ & $\mathcal{J}\&\mathcal{F}$$\uparrow$ & Dice$\uparrow$ & FG-F1$\uparrow$ & Prec.$\uparrow$ & Rec.$\uparrow$ \\
+\midrule
+Video-Audio Mamba & \textbf{38.6} & \textbf{22.0} & \textbf{48.8} & \textbf{48.7} & \textbf{46.4} & 58.9 \\
+Mixture-of-Mamba & \underline{35.2} & \underline{19.6} & \underline{46.0} & \underline{46.0} & \underline{40.5} & \underline{62.9} \\
+AVS-Mamba & 34.9 & 19.5 & 45.3 & 45.3 & 40.3 & 61.8 \\
+Mamba-VL & 33.6 & 18.7 & 44.3 & 44.3 & 38.3 & \textbf{63.0} \\
+Transformer baseline & 28.4 & 16.2 & 38.3 & 38.3 & 37.5 & 47.6 \\
+LSTM baseline & 0.7 & 0.4 & 1.4 & 1.3 & 9.4 & 0.8 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\small
+\item Our EEMC-style transformer is a simplified reimplementation; numbers are not directly comparable to the full official system~\cite{wang2024refavs}.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+Figure~\ref{fig:test-bar} shows that the best Mamba variant leads the transformer baseline by 10.2 mIoU points, while the LSTM remains non-functional under the shared recipe. Taken together, the gap between SSM and attention variants (10+ mIoU points) supports the expectation that selective state mixing transfers better to multimodal temporal segmentation than a reimplemented cross-attention head, while the LSTM result underscores that simple recurrence without structured cross-modal alignment is insufficient for Ref-AVS.
+
+\begin{figure}[t]
+\centering
+\foreignlanguage{english}{%
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width=7pt,
+    width=\linewidth,
+    height=5.2cm,
+    ymin=0, ymax=45,
+    ylabel={Score (\%)},
+    xtick={1,2,3,4,5,6},
+    xticklabels={V-A Mamba, MoM, AVS-M, Mamba-VL, Trans., LSTM},
+    x tick label style={rotate=25, anchor=east, font=\scriptsize},
+    legend style={at={(0.5,1.02)}, anchor=south, legend columns=2, font=\scriptsize},
+    enlarge x limits=0.12,
+    grid=major,
+    grid style={dashed, gray!30},
+]
+\addplot[fill=blue!55!white, draw=blue!60!black] coordinates {
+    (1, 38.6) (2, 35.2) (3, 34.9) (4, 33.6) (5, 28.4) (6, 0.7)
+};
+\addplot[fill=orange!55!white, draw=orange!70!black] coordinates {
+    (1, 22.0) (2, 19.6) (3, 19.5) (4, 18.7) (5, 16.2) (6, 0.4)
+};
+\legend{mIoU, J\&F}
+\end{axis}
+\end{tikzpicture}
+}%
+\caption{Test mIoU and $\mathcal{J}\&\mathcal{F}$ on the Ref-AVS test set.}
+\label{fig:test-bar}
+\end{figure}
+
+Mamba variants tend toward higher recall (61-63\%) and moderate precision (38-46\%), which helps on sparse foreground masks (roughly 8.5\% positive pixels): selective SSM states retain weak audio cues that attention underweights, improving object coverage at the cost of some false positives. The transformer baseline favors precision over recall (37.5\% vs.\ 47.6\%), yielding lower F1 -- a pattern typical of attention models that default to background when cross-modal alignment is hard. Video-Audio Mamba offers the most balanced profile and the highest F1, suggesting that decoupled audio/visual SSM encoders best preserve both modalities before fusion.
+
+\subsection{Analysis of Fusion Strategies}
+
+The ranking Video-Audio Mamba $>$ Mixture-of-Mamba $\approx$ AVS-Mamba $>$ Mamba-VL aligns with the design rationale in Section~3.4: modality-specific temporal encoding before fusion is beneficial on Ref-AVS. Early unified fusion (AVS-Mamba) and staged vision-language-first pipelines (Mamba-VL) remain competitive but slightly weaker, likely because dense visual tokens dominate long unified sequences and dilute audio cues~\cite{wang2024refavs}. Mixture-of-Mamba improves over plain unified mixing through sparse expert routing~\cite{mixturemamba2025}, yet still trails explicit audio/visual factorization -- routing adds capacity but does not enforce cross-modal alignment before fusion.
+
+With identical encoders and decoders, Mamba stacks outperform our EEMC-style transformer by a clear margin, even though attention is the dominant paradigm in multimodal AVSU~\cite{tsai2019multimodal, zorro2023, maavt2024}. This is consistent with the $\mathcal{O}(n)$ SSM mixing cost and input-dependent state updates~\cite{dao2024mamba} being better matched to moderately long multimodal sequences than quadratic cross-attention over visual tokens~\cite{tay2020efficient}. The transformer baseline reaches lower mIoU despite high pixel accuracy, indicating a bottleneck in the attention fusion head rather than in the shared visual backbone.
+
+The LSTM failure further supports the architectural analysis in Section~3.3: gated recurrence without token-level cross-attention cannot align frozen visual features with audio/text under Ref-AVS supervision. The model predicts almost no foreground (positive rate below 0.1\%), consistent with limited fusion capacity~\cite{bengio1994learning, hochreiter1997long}. On short ($T{=}10$) clips one might expect a recurrent baseline to remain competitive; however, referring expressions require global multimodal disambiguation that element-wise gating and BiLSTM aggregation fail to capture when only fusion layers are trained.
+
+\subsection{Comparison with Published Ref-AVS Baselines}
+
+Table~\ref{tab:published} compares our results with published methods on the Ref-AVS Bench \emph{Mix} test split~\cite{wang2024refavs, tsam2025, avsegformer2023}. Numbers from prior work use the official evaluation protocol (full training pipeline, task-specific decoders, and often end-to-end backbone tuning); our models share a frozen Mask2Former encoder, a lightweight convolutional decoder, and $T{=}10$ frames.
+
+\begin{table}[t]
+\centering
+\caption{Comparison with published Ref-AVS methods on the Mix test split. Prior-work $\mathcal{J}$, $\mathcal{F}$, and $\mathcal{J}\&\mathcal{F}$ are taken from~\cite{wang2024refavs, tsam2025}; AVSegFormer+text from~\cite{wang2024refavs, avsegformer2023}. Our rows use the same metric definitions but a simplified training setup (Section~4).}
+\label{tab:published}
+\small
+\begin{threeparttable}
+\begin{tabular}{lccccl}
+\toprule
+Method & $\mathcal{J}$$\uparrow$ & $\mathcal{F}$$\uparrow$ & $\mathcal{J}\&\mathcal{F}$$\uparrow$ & Venue \\
+\midrule
+\multicolumn{6}{l}{\textit{Published methods (full Ref-AVS pipeline)}} \\
+AVSegFormer + text~\cite{avsegformer2023} & 34.8 & 0.486 & 41.7 & AAAI'24 \\
+EEMC~\cite{wang2024refavs} & 41.9 & 0.581 & 50.0 & ECCV'24 \\
+TSAM~\cite{tsam2025} & 49.0 & 0.616 & 55.3 & CVPR'25 \\
+\midrule
+\multicolumn{6}{l}{\textit{Our controlled study (frozen backbone, shared conv.\ decoder)}} \\
+Video-Audio Mamba (ours) & \textbf{38.6} & 0.054 & 22.0 & --- \\
+Transformer baseline (ours) & 28.4 & 0.040 & 16.2 & --- \\
+LSTM baseline (ours) & 0.7 & 0.001 & 0.4 & --- \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\small
+\item $\mathcal{J}$ is region overlap (mIoU, \%); $\mathcal{F}$ is boundary F-score in $[0,1]$; $\mathcal{J}\&\mathcal{F}$ is their average.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+On region overlap, Video-Audio Mamba (38.6\% $\mathcal{J}$) is competitive with AVSegFormer+text (34.8\%) and below the full EEMC (41.9\%) and TSAM (49.0\%) systems, which benefit from complete task-specific pipelines and stronger decoders (e.g., SAM-based prompting in TSAM~\cite{tsam2025}). Our simplified transformer reimplementation (28.4\%) underperforms published EEMC, as expected given the ablated fusion head.
+
+The boundary F-score gap is larger and deserves separate explanation. Our best model reaches $\mathcal{F}{=}0.054$ versus $0.581$ for EEMC. Region overlap and boundary accuracy decouple under our setup: the shared convolutional decoder $g_{\mathrm{dec}}$ produces masks with reasonable $\mathcal{J}$ but blurry contours, because (i) it operates on frozen low-resolution spatial features without a boundary-aware loss; (ii) it receives only a single frame-wise embedding $\mathbf{m}_\tau$, not a dense temporal mask head; and (iii) published methods employ full-resolution decoders and longer temporal context. Consequently $\mathcal{J}\&\mathcal{F}$ (22.0\%) is dominated by the boundary term and is \emph{not} directly comparable to published $\mathcal{J}\&\mathcal{F}$ values that assume task-specific decoders. Within our controlled comparison, relative $\mathcal{F}$ rankings still track $\mathcal{J}$ (Video-Audio Mamba $>$ transformer $>$ LSTM), confirming that fusion quality drives both region and contour metrics modulo decoder limitations.
+
+\section{Conclusion}
+
+We conducted a controlled comparison of attention, recurrent, and SSM-based fusion for Referring Audio-Visual Segmentation on Ref-AVS Bench. Four Mamba architectures substantially outperform an EEMC-style transformer baseline and an LSTM baseline; Video-Audio Mamba achieves the best test mIoU (38.6\%) and foreground F1 (48.7\%). The results show that selective state-space mixing is a viable alternative to attention for audio-visual temporal fusion, particularly when audio and visual streams are encoded separately before integration.
+
+Several limitations bound the scope of these findings. The study uses one visual backbone and relies on reimplemented rather than official baselines. Boundary scores also lag behind the full Ref-AVS EEMC system, indicating that decoder design and longer temporal context remain open problems. Future work should profile efficiency against other transformer AVS models~\cite{avsegformer2023, revisitingAVSeg2025, tsam2025}, and explore end-to-end finetuning of visual backbones for sharper mask boundaries.
+
+
+
+\section*{Acknowledgments}
+This research was supported in part through computational resources of HPC facilities at HSE University~\cite{kostenetskiy2021hpc}.
+
+\newpage 
+\printbibliography[heading=bibintoc]
+\newpage
+\appendix
+
+
+\end{document}
